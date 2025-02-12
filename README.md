@@ -1,0 +1,2 @@
+# Gossip: Decentralized Optimization via Gossip Protocol
+A lightweight Python library implementing **gossip protocol** for decentralized optimization in distributed systems. Designed for scalability and fault tolerance in peer-to-peer networks.
