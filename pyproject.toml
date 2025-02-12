@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+requires-python = ">=3.10"
+name = "gossip"
+version = "0.1.0"
+description = "Gossip Protocol for Distributed Optimization."
+authors = [
+    {name = "Rui Huang", email = "R.Huang@lboro.ac.uk"}
+]
+
+dependencies = [
+    "numpy>=1.26.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
