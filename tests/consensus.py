@@ -10,7 +10,7 @@ from gossip import create_gossip_network, Gossip
 class Node(Process):
     alpha: float = 0.5
     iterations: int = 50
-    results_path: str = "results/consensus/"
+    results_path: str = "results/"
 
     def __init__(
         self, name: str, communication: Gossip, initial_state: NDArray[np.float64]
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     for node in consensus_nodes:
         node.join()
 
-    figure_path = "figures/consensus/"
+    figure_path = "figures/"
 
     fig1, ax1 = plt.subplots()
 
@@ -105,11 +105,11 @@ if __name__ == "__main__":
     fig2, ax2 = plt.subplots()
 
     states_dict: Dict[str, NDArray[np.float64]] = {
-        "1": np.load("results/consensus/node_1.npy"),
-        "2": np.load("results/consensus/node_2.npy"),
-        "3": np.load("results/consensus/node_3.npy"),
-        "4": np.load("results/consensus/node_4.npy"),
-        "5": np.load("results/consensus/node_5.npy"),
+        "1": np.load("results/node_1.npy"),
+        "2": np.load("results/node_2.npy"),
+        "3": np.load("results/node_3.npy"),
+        "4": np.load("results/node_4.npy"),
+        "5": np.load("results/node_5.npy"),
     }
 
     for name in nodes:
