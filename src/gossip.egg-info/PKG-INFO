@@ -1,7 +1,0 @@
-Metadata-Version: 2.2
-Name: gossip
-Version: 0.1.0
-Summary: Gossip Protocol for Distributed Optimization.
-Author-email: Rui Huang <R.Huang@lboro.ac.uk>
-Requires-Python: >=3.10
-Requires-Dist: numpy>=1.26.4
