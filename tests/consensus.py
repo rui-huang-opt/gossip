@@ -53,7 +53,7 @@ if __name__ == "__main__":
     node_ids = [nd["id"] for nd in config["NODE_DATA"]]
     edge_pairs = config["EDGE_PAIRS"]
 
-    if config["RUN_TYPE"] == "EXP":
+    if config["RUN_TYPE"] == "ALG":
         Node.configs = config["NODE_CONFIGS"]
 
         nodes_state: Dict[str, NDArray[np.float64]] = {

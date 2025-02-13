@@ -1,4 +1,4 @@
-RUN_TYPE = "VIS" # "EXP" or "VIS"
+RUN_TYPE = "ALG" # "ALG" or "VIS"
 
 EDGE_PAIRS = [["1", "2"], ["2", "3"], ["3", "4"], ["4", "5"], ["5", "1"]]
 
