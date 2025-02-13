@@ -1,0 +1,33 @@
+RUN_TYPE = "VIS" # "EXP" or "VIS"
+
+EDGE_PAIRS = [["1", "2"], ["2", "3"], ["3", "4"], ["4", "5"], ["5", "1"]]
+
+[[NODE_DATA]]
+id = "1"
+initial_state = [10.1, 20.2, 30.3]
+position = [0, 0]
+
+[[NODE_DATA]]
+id = "2"
+initial_state = [52.3, 42.2, 32.1]
+position = [1, 0]
+
+[[NODE_DATA]]
+id = "3"
+initial_state = [25.6, 35.5, 45.4]
+position = [1, 1]
+
+[[NODE_DATA]]
+id = "4"
+initial_state = [17.7, 27.6, 37.5]
+position = [0, 1]
+
+[[NODE_DATA]]
+id = "5"
+initial_state = [20.9, 30.8, 40.7]
+position = [0.5, 0.5]
+
+[NODE_CONFIGS]
+iterations = 50
+step_size = 0.5
+results_path = "results/consensus"

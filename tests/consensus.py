@@ -1,28 +1,37 @@
+import os
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from typing import Dict
+import toml
+from typing import Dict, TypedDict
 from numpy.typing import NDArray
 from multiprocessing import Process
 from gossip import create_gossip_network, Gossip
 
 
+class NodeConfig(TypedDict):
+    iterations: int
+    step_size: float
+    results_path: str
+
+
 class Node(Process):
-    alpha: float = 0.5
-    iterations: int = 50
-    results_path: str = "results/"
+    configs: NodeConfig = None
 
     def __init__(
-        self, name: str, communication: Gossip, initial_state: NDArray[np.float64]
+        self, id: str, communication: Gossip, initial_state: NDArray[np.float64]
     ):
         super().__init__()
 
-        self.name = name
+        if self.configs is None:
+            raise ValueError("Node configs not set")
+
+        self.id = id
         self.communication = communication
-        self.state = np.tile(initial_state, (self.iterations + 1, 1))
+        self.state = np.tile(initial_state, (self.configs["iterations"] + 1, 1))
 
     def run(self):
-        for k in range(self.iterations):
+        for k in range(self.configs["iterations"]):
             self.communication.broadcast(self.state[k])
             neighbors_state = self.communication.gather()
 
@@ -30,102 +39,97 @@ class Node(Process):
                 neighbors_state
             )
 
-            self.state[k + 1] = self.state[k] - self.alpha * consensus_error
+            self.state[k + 1] = (
+                self.state[k] - self.configs["step_size"] * consensus_error
+            )
 
-        np.save(self.results_path + f"node_{self.name}.npy", self.state)
+        os.makedirs(self.configs["results_path"], exist_ok=True)
+        np.save(self.configs["results_path"] + f"/node_{self.id}.npy", self.state)
 
 
 if __name__ == "__main__":
-    nodes = ["1", "2", "3", "4", "5"]
-    edges = [("1", "2"), ("2", "3"), ("3", "4"), ("4", "5"), ("5", "1")]
+    config = toml.load("configs/consensus.toml")
 
-    nodes_state: Dict[str, NDArray[np.float64]] = {
-        "1": np.array([10.1, 20.2, 30.3]),
-        "2": np.array([52.3, 42.2, 32.1]),
-        "3": np.array([25.6, 35.5, 45.4]),
-        "4": np.array([17.7, 27.6, 37.5]),
-        "5": np.array([20.9, 30.8, 40.7]),
-    }
+    node_ids = [nd["id"] for nd in config["NODE_DATA"]]
+    edge_pairs = config["EDGE_PAIRS"]
 
-    gossip_network = create_gossip_network(nodes, edges)
+    if config["RUN_TYPE"] == "EXP":
+        Node.configs = config["NODE_CONFIGS"]
 
-    consensus_nodes = [
-        Node(name, gossip_network[name], nodes_state[name]) for name in nodes
-    ]
+        nodes_state: Dict[str, NDArray[np.float64]] = {
+            nd["id"]: np.array(nd["initial_state"]) for nd in config["NODE_DATA"]
+        }
+        gossip_network = create_gossip_network(node_ids, edge_pairs)
 
-    for node in consensus_nodes:
-        node.start()
+        consensus_nodes = [
+            Node(id, gossip_network[id], nodes_state[id]) for id in node_ids
+        ]
 
-    for node in consensus_nodes:
-        node.join()
+        for node in consensus_nodes:
+            node.start()
 
-    figure_path = "figures/"
+        for node in consensus_nodes:
+            node.join()
 
-    fig1, ax1 = plt.subplots()
+    elif config["RUN_TYPE"] == "VIS":
+        figure_path = "figures/consensus/"
 
-    nodes_pos = {
-        "1": (0, 0),
-        "2": (1, 0),
-        "3": (1, 1),
-        "4": (0, 1),
-        "5": (0.5, 0.5),
-    }
+        fig1, ax1 = plt.subplots()
 
-    G = nx.Graph()
-    G.add_nodes_from(nodes)
-    G.add_edges_from(edges)
+        node_pos = {nd["id"]: nd["position"] for nd in config["NODE_DATA"]}
 
-    nx.draw(
-        G,
-        nodes_pos,
-        ax=ax1,
-        with_labels=True,
-        node_size=1000,
-        node_color="skyblue",
-        font_size=10,
-        font_color="black",
-        font_weight="bold",
-        edge_color="black",
-        width=2,
-        style="dashed",
-    )
+        G = nx.Graph()
+        G.add_nodes_from(node_ids)
+        G.add_edges_from(edge_pairs)
 
-    ax1.set_title("Graph G")
+        nx.draw(
+            G,
+            node_pos,
+            ax=ax1,
+            with_labels=True,
+            node_size=1000,
+            node_color="skyblue",
+            font_size=10,
+            font_color="black",
+            font_weight="bold",
+            edge_color="black",
+            width=2,
+            style="dashed",
+        )
 
-    fig1.savefig(figure_path + "graph.png", dpi=300, bbox_inches="tight")
+        ax1.set_title("Graph G")
 
-    nodes_color = {
-        "1": "red",
-        "2": "blue",
-        "3": "green",
-        "4": "orange",
-        "5": "purple",
-    }
+        fig1.savefig(figure_path + "graph.png", dpi=300, bbox_inches="tight")
 
-    fig2, ax2 = plt.subplots()
+        node_colors = {
+            "1": "red",
+            "2": "blue",
+            "3": "green",
+            "4": "orange",
+            "5": "purple",
+        }
 
-    states_dict: Dict[str, NDArray[np.float64]] = {
-        "1": np.load("results/node_1.npy"),
-        "2": np.load("results/node_2.npy"),
-        "3": np.load("results/node_3.npy"),
-        "4": np.load("results/node_4.npy"),
-        "5": np.load("results/node_5.npy"),
-    }
+        fig2, ax2 = plt.subplots()
 
-    for name in nodes:
-        for i in range(3):
-            (line,) = ax2.plot(
-                states_dict[name][:, i],
-                color=nodes_color[name],
-            )
+        states_dict: Dict[str, NDArray[np.float64]] = {
+            id: np.load(config["NODE_CONFIGS"]["results_path"] + f"/node_{id}.npy")
+            for id in node_ids
+        }
 
-        line.set_label(f"Node {name}")
+        for id in node_ids:
+            for i in range(3):
+                (line,) = ax2.plot(
+                    states_dict[id][:, i],
+                    color=node_colors[id],
+                )
 
-    ax2.set_xlabel("Iterations")
-    ax2.set_ylabel("State")
+            line.set_label(f"Node {id}")
 
-    ax2.legend(loc="upper right")
+        ax2.set_xlabel("Iterations")
+        ax2.set_ylabel("State")
 
-    ax2.set_title("Consensus")
+        ax2.legend(loc="upper right")
 
-    fig2.savefig(figure_path + "consensus.png", dpi=300, bbox_inches="tight")
+        ax2.set_title("Consensus")
+
+        fig2.savefig(figure_path + "consensus.png", dpi=300, bbox_inches="tight")
