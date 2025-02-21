@@ -19,7 +19,7 @@ class Node(Process):
     configs: NodeConfig = None
 
     def __init__(
-        self, id: str, communication: Gossip, initial_state: NDArray[np.float64]
+        self, id: str, comm: Gossip, initial_state: NDArray[np.float64]
     ):
         super().__init__()
 
@@ -27,15 +27,15 @@ class Node(Process):
             raise ValueError("Node configs not set")
 
         self.id = id
-        self.communication = communication
+        self.comm = comm
         self.state = np.tile(initial_state, (self.configs["iterations"] + 1, 1))
 
     def run(self):
         for k in range(self.configs["iterations"]):
-            self.communication.broadcast(self.state[k])
-            neighbors_state = self.communication.gather()
+            self.comm.broadcast(self.state[k])
+            neighbors_state = self.comm.gather()
 
-            consensus_error = self.communication.degree * self.state[k] - sum(
+            consensus_error = self.comm.degree * self.state[k] - sum(
                 neighbors_state
             )
 

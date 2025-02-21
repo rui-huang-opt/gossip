@@ -25,11 +25,11 @@ class Gossip:
     def neighbor_ids(self) -> List[str]:
         return self._connections.keys()
 
-    def send(self, neighbor: str, state: NDArray[np.float64]):
-        self._connections[neighbor].send(state)
+    def send(self, id: str, state: NDArray[np.float64]):
+        self._connections[id].send(state)
 
-    def recv(self, neighbor: str) -> NDArray[np.float64]:
-        return self._connections[neighbor].recv()
+    def recv(self, id: str) -> NDArray[np.float64]:
+        return self._connections[id].recv()
 
     def broadcast(self, state: NDArray[np.float64]):
         for conn in self._connections.values():
