@@ -15,33 +15,37 @@ class Gossip:
     """
 
     def __init__(self, connections: Dict[str, Connection] = None):
-        self.connections = connections if connections is not None else {}
+        self._connections = connections if connections is not None else {}
 
     @property
-    def degree(self):
-        return len(self.connections)
+    def degree(self) -> int:
+        return len(self._connections)
+
+    @property
+    def neighbor_ids(self) -> List[str]:
+        return self._connections.keys()
 
     def send(self, neighbor: str, state: NDArray[np.float64]):
-        self.connections[neighbor].send(state)
+        self._connections[neighbor].send(state)
 
     def recv(self, neighbor: str) -> NDArray[np.float64]:
-        return self.connections[neighbor].recv()
+        return self._connections[neighbor].recv()
 
     def broadcast(self, state: NDArray[np.float64]):
-        for conn in self.connections.values():
+        for conn in self._connections.values():
             conn.send(state)
 
     def gather(self) -> List[NDArray[np.float64]]:
-        return [conn.recv() for conn in self.connections.values()]
+        return [conn.recv() for conn in self._connections.values()]
 
     def add_connection(self, neighbor: str, conn: Connection):
-        self.connections[neighbor] = conn
+        self._connections[neighbor] = conn
 
     def remove_connection(self, neighbor: str):
-        self.connections.pop(neighbor)
+        self._connections.pop(neighbor)
 
     def close(self):
-        for conn in self.connections.values():
+        for conn in self._connections.values():
             conn.close()
 
 
@@ -51,6 +55,7 @@ def create_gossip_network(
     """
     Create a gossip network from a list of nodes and edges.
     """
+
     gossips = {node: Gossip() for node in nodes}
 
     for edge in edges:
