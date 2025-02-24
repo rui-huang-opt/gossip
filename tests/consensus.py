@@ -16,35 +16,34 @@ class NodeConfig(TypedDict):
 
 
 class Node(Process):
-    configs: NodeConfig = None
-
     def __init__(
-        self, id: str, comm: Gossip, initial_state: NDArray[np.float64]
+        self,
+        comm: Gossip,
+        initial_state: NDArray[np.float64],
+        max_iter: int,
+        step_size: float,
+        results_path: str,
     ):
         super().__init__()
 
-        if self.configs is None:
-            raise ValueError("Node configs not set")
-
-        self.id = id
         self.comm = comm
-        self.state = np.tile(initial_state, (self.configs["iterations"] + 1, 1))
+        self.state = np.tile(initial_state, (max_iter + 1, 1))
+
+        self.max_iter = max_iter
+        self.step_size = step_size
+        self.results_path = results_path
 
     def run(self):
-        for k in range(self.configs["iterations"]):
+        for k in range(self.max_iter):
             self.comm.broadcast(self.state[k])
             neighbors_state = self.comm.gather()
 
-            consensus_error = self.comm.degree * self.state[k] - sum(
-                neighbors_state
-            )
+            consensus_error = self.comm.degree * self.state[k] - sum(neighbors_state)
 
-            self.state[k + 1] = (
-                self.state[k] - self.configs["step_size"] * consensus_error
-            )
+            self.state[k + 1] = self.state[k] - self.step_size * consensus_error
 
-        os.makedirs(self.configs["results_path"], exist_ok=True)
-        np.save(self.configs["results_path"] + f"/node_{self.id}.npy", self.state)
+        os.makedirs(self.results_path, exist_ok=True)
+        np.save(self.results_path + f"/node_{self.comm.id}.npy", self.state)
 
 
 if __name__ == "__main__":
@@ -54,15 +53,14 @@ if __name__ == "__main__":
     edge_pairs = config["EDGE_PAIRS"]
 
     if config["RUN_TYPE"] == "ALG":
-        Node.configs = config["NODE_CONFIGS"]
-
         nodes_state: Dict[str, NDArray[np.float64]] = {
             nd["id"]: np.array(nd["initial_state"]) for nd in config["NODE_DATA"]
         }
         gossip_network = create_gossip_network(node_ids, edge_pairs)
 
         consensus_nodes = [
-            Node(id, gossip_network[id], nodes_state[id]) for id in node_ids
+            Node(gossip_network[id], nodes_state[id], **config["NODE_CONFIGS"])
+            for id in node_ids
         ]
 
         for node in consensus_nodes:

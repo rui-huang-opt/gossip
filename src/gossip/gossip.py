@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Dict, List, Tuple
+from typing import List, Tuple, Dict
 from multiprocessing import Pipe
 from multiprocessing.connection import Connection
 
@@ -14,8 +14,9 @@ class Gossip:
     messages to all neighbors, and gathering messages from all neighbors.
     """
 
-    def __init__(self, connections: Dict[str, Connection] = None):
-        self._connections = connections if connections is not None else {}
+    def __init__(self, id: str, **connections: Connection):
+        self.id = id
+        self._connections = connections
 
     @property
     def degree(self) -> int:
@@ -50,17 +51,29 @@ class Gossip:
 
 
 def create_gossip_network(
-    nodes: List[str], edges: List[Tuple[str, str]]
+    node_ids: List[str], edge_pairs: List[Tuple[str, str]]
 ) -> Dict[str, Gossip]:
     """
     Create a gossip network from a list of nodes and edges.
+
+    Parameters
+    ----------
+    node_ids : List[str]
+        A list of node identifiers.
+    edge_pairs : List[Tuple[str, str]]
+        A list of pairs of node identifiers representing edges in the network.
+
+    Returns
+    -------
+    Dict[str, Gossip]
+        A dictionary of gossip communicators indexed by node identifier.
     """
 
-    gossips = {node: Gossip() for node in nodes}
+    gossip_map = {id: Gossip(id) for id in node_ids}
 
-    for edge in edges:
-        conn = Pipe()
-        gossips[edge[0]].add_connection(edge[1], conn[0])
-        gossips[edge[1]].add_connection(edge[0], conn[1])
+    for node1, node2 in edge_pairs:
+        conn1, conn2 = Pipe()
+        gossip_map[node1].add_connection(node2, conn1)
+        gossip_map[node2].add_connection(node1, conn2)
 
-    return gossips
+    return gossip_map
