@@ -3,16 +3,10 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import toml
-from typing import Dict, TypedDict
+from typing import Dict
 from numpy.typing import NDArray
 from multiprocessing import Process
 from gossip import create_gossip_network, Gossip
-
-
-class NodeConfig(TypedDict):
-    iterations: int
-    step_size: float
-    results_path: str
 
 
 class Node(Process):
@@ -43,24 +37,26 @@ class Node(Process):
             self.state[k + 1] = self.state[k] - self.step_size * consensus_error
 
         os.makedirs(self.results_path, exist_ok=True)
-        np.save(self.results_path + f"/node_{self.comm.id}.npy", self.state)
+        np.save(self.results_path + f"/node_{self.comm.name}.npy", self.state)
 
 
 if __name__ == "__main__":
-    config = toml.load("configs/consensus.toml")
+    configs = toml.load("configs/consensus.toml")
 
-    node_ids = [nd["id"] for nd in config["NODE_DATA"]]
-    edge_pairs = config["EDGE_PAIRS"]
+    node_names = configs["node_names"]
+    edge_pairs = configs["edge_pairs"]
 
-    if config["RUN_TYPE"] == "ALG":
-        nodes_state: Dict[str, NDArray[np.float64]] = {
-            nd["id"]: np.array(nd["initial_state"]) for nd in config["NODE_DATA"]
-        }
-        gossip_network = create_gossip_network(node_ids, edge_pairs)
+    if configs["run_type"] == "algorithm":
+        initial_states  = configs["initial_states"]
+        gossip_network = create_gossip_network(node_names, edge_pairs)
 
         consensus_nodes = [
-            Node(gossip_network[id], nodes_state[id], **config["NODE_CONFIGS"])
-            for id in node_ids
+            Node(
+                gossip_network[name],
+                initial_states[name],
+                **configs["node_params"],
+            )
+            for name in node_names
         ]
 
         for node in consensus_nodes:
@@ -69,20 +65,18 @@ if __name__ == "__main__":
         for node in consensus_nodes:
             node.join()
 
-    elif config["RUN_TYPE"] == "VIS":
+    elif configs["run_type"] == "visualization":
         figure_path = "figures/consensus/"
 
         fig1, ax1 = plt.subplots()
 
-        node_pos = {nd["id"]: nd["position"] for nd in config["NODE_DATA"]}
-
         G = nx.Graph()
-        G.add_nodes_from(node_ids)
+        G.add_nodes_from(node_names)
         G.add_edges_from(edge_pairs)
 
         nx.draw(
             G,
-            node_pos,
+            configs["node_pos"],
             ax=ax1,
             with_labels=True,
             node_size=1000,
@@ -110,18 +104,18 @@ if __name__ == "__main__":
         fig2, ax2 = plt.subplots()
 
         states_dict: Dict[str, NDArray[np.float64]] = {
-            id: np.load(config["NODE_CONFIGS"]["results_path"] + f"/node_{id}.npy")
-            for id in node_ids
+            name: np.load(configs["node_params"]["results_path"] + f"/node_{name}.npy")
+            for name in node_names
         }
 
-        for id in node_ids:
+        for name in node_names:
             for i in range(3):
                 (line,) = ax2.plot(
-                    states_dict[id][:, i],
-                    color=node_colors[id],
+                    states_dict[name][:, i],
+                    color=node_colors[name],
                 )
 
-            line.set_label(f"Node {id}")
+            line.set_label(f"Node {name}")
 
         ax2.set_xlabel("Iterations")
         ax2.set_ylabel("State")
