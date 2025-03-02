@@ -1,4 +1,4 @@
-run_type = "visualization" # algorithm or visualization
+run_type = "algorithm" # algorithm or visualization
 
 node_names = ["1", "2", "3", "4", "5"]
 edge_pairs = [["1", "2"], ["2", "3"], ["3", "4"], ["4", "5"], ["5", "1"]]
