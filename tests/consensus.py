@@ -46,7 +46,7 @@ if __name__ == "__main__":
     node_names = configs["node_names"]
     edge_pairs = configs["edge_pairs"]
 
-    if configs["run_type"] == "algorithm":
+    if configs["run_type"] == "test":
         initial_states  = configs["initial_states"]
         gossip_network = create_gossip_network(node_names, edge_pairs)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
         for node in consensus_nodes:
             node.join()
 
-    elif configs["run_type"] == "visualization":
+    elif configs["run_type"] == "plot":
         figure_path = "figures/consensus/"
 
         fig1, ax1 = plt.subplots()
@@ -125,3 +125,6 @@ if __name__ == "__main__":
         ax2.set_title("Consensus")
 
         fig2.savefig(figure_path + "consensus.png", dpi=300, bbox_inches="tight")
+
+    else:
+        raise ValueError("Invalid run type")
