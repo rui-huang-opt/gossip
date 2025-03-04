@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.typing import NDArray
+from numpy.random import normal
 from typing import List, Tuple, Dict
 from multiprocessing import Pipe
 from multiprocessing.connection import Connection
@@ -14,9 +15,16 @@ class Gossip:
     messages to all neighbors, and gathering messages from all neighbors.
     """
 
-    def __init__(self, name: str, **connections: Connection):
+    def __init__(
+        self,
+        name: str,
+        noise_scale: int | float | None,
+    ):
         self.name = name
-        self._connections = connections
+        self._noise_scale = noise_scale
+        self._connections: Dict[str, Connection] = {}
+
+        print(f"Node {name} initialized, noise scale: {noise_scale}")
 
     @property
     def degree(self) -> int:
@@ -27,14 +35,22 @@ class Gossip:
         return self._connections.keys()
 
     def send(self, name: str, state: NDArray[np.float64]):
-        self._connections[name].send(state)
+        if self._noise_scale is None:
+            self._connections[name].send(state)
+        else:
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            self._connections[name].send(state + noise)
 
     def recv(self, name: str) -> NDArray[np.float64]:
         return self._connections[name].recv()
 
     def broadcast(self, state: NDArray[np.float64]):
         for conn in self._connections.values():
-            conn.send(state)
+            if self._noise_scale is None:
+                conn.send(state)
+            else:
+                noise = normal(scale=self._noise_scale, size=state.shape)
+                conn.send(state + noise)
 
     def gather(self) -> List[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
@@ -51,7 +67,9 @@ class Gossip:
 
 
 def create_gossip_network(
-    node_names: List[str], edge_pairs: List[Tuple[str, str]]
+    node_names: List[str],
+    edge_pairs: List[Tuple[str, str]],
+    noise_scale: int | float | None = None,
 ) -> Dict[str, Gossip]:
     """
     Create a gossip network from a list of nodes and edges.
@@ -69,7 +87,7 @@ def create_gossip_network(
         A dictionary of gossip communicators indexed by node identifier.
     """
 
-    gossip_map = {name: Gossip(name) for name in node_names}
+    gossip_map = {name: Gossip(name, noise_scale) for name in node_names}
 
     for u, v in edge_pairs:
         conn_u, conn_v = Pipe()

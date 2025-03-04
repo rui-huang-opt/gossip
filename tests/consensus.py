@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     if configs["run_type"] == "test":
         initial_states  = configs["initial_states"]
-        gossip_network = create_gossip_network(node_names, edge_pairs)
+        gossip_network = create_gossip_network(node_names, edge_pairs, noise_scale=0.1)
 
         consensus_nodes = [
             Node(
