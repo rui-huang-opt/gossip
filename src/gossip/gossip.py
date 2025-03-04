@@ -24,8 +24,6 @@ class Gossip:
         self._noise_scale = noise_scale
         self._connections: Dict[str, Connection] = {}
 
-        print(f"Node {name} initialized, noise scale: {noise_scale}")
-
     @property
     def degree(self) -> int:
         return len(self._connections)
