@@ -11,8 +11,11 @@ authors = [
     {name = "Rui Huang", email = "R.Huang@lboro.ac.uk"}
 ]
 
-dependencies = [
-    "numpy>=1.26.4",
+[project.optional-dependencies]
+test = [
+    "matplotlib==3.7.4",
+    "networkx==3.4.2",
+    "toml==0.10.2",
 ]
 
 [tool.setuptools.packages.find]
