@@ -10,7 +10,7 @@ pip install git+https://github.com/rui-huang-opt/gossip.git
 ### Method 2: Clone repository and install
 ```bash
 git clone https://github.com/rui-huang-opt/gossip.git
-cd pdra
+cd gossip
 pip install .
 ```
 
