@@ -2,7 +2,6 @@ import os
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-import toml
 from typing import Dict
 from numpy.typing import NDArray
 from multiprocessing import Process
