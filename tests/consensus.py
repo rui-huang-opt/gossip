@@ -28,12 +28,9 @@ class Node(Process):
 
     def run(self):
         for k in range(self.max_iter):
-            self.comm.broadcast(self.state[k])
-            neighbors_state = self.comm.gather()
+            delta_state = self.comm.compute_laplacian(self.state[k])
 
-            consensus_error = self.comm.degree * self.state[k] - sum(neighbors_state)
-
-            self.state[k + 1] = self.state[k] - self.step_size * consensus_error
+            self.state[k + 1] = self.state[k] - self.step_size * delta_state
 
         os.makedirs(self.results_path, exist_ok=True)
         np.save(
