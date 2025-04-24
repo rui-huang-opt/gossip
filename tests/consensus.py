@@ -37,25 +37,33 @@ class Node(Process):
             self.state[k + 1] = self.state[k] - self.step_size * consensus_error
 
         os.makedirs(self.results_path, exist_ok=True)
-        np.save(self.results_path + f"/node_{self.comm.name}.npy", self.state)
+        np.save(
+            os.path.join(self.results_path, f"node_{self.comm.name}.npy"), self.state
+        )
 
 
 if __name__ == "__main__":
-    configs = toml.load("configs/consensus.toml")
+    script_type = "plot"  # "test" or "plot"
 
-    node_names = configs["node_names"]
-    edge_pairs = configs["edge_pairs"]
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    results_dir = os.path.join(script_dir, "results", "consensus")
 
-    if configs["run_type"] == "test":
-        initial_states  = configs["initial_states"]
+    node_names = ["1", "2", "3", "4", "5"]
+    edge_pairs = [("1", "2"), ("2", "3"), ("3", "4"), ("4", "5"), ("5", "1")]
+
+    if script_type == "test":
+        initial_states = {
+            "1": np.array([10.1, 20.2, 30.3]),
+            "2": np.array([52.3, 42.2, 32.1]),
+            "3": np.array([25.6, 35.5, 45.4]),
+            "4": np.array([17.7, 27.6, 37.5]),
+            "5": np.array([20.9, 30.8, 40.7]),
+        }
+        node_params = {"max_iter": 50, "step_size": 0.5, "results_path": results_dir}
         gossip_network = create_gossip_network(node_names, edge_pairs, noise_scale=0.1)
 
         consensus_nodes = [
-            Node(
-                gossip_network[name],
-                initial_states[name],
-                **configs["node_params"],
-            )
+            Node(gossip_network[name], initial_states[name], **node_params)
             for name in node_names
         ]
 
@@ -65,8 +73,8 @@ if __name__ == "__main__":
         for node in consensus_nodes:
             node.join()
 
-    elif configs["run_type"] == "plot":
-        figure_path = "figures/consensus/"
+    elif script_type == "plot":
+        figure_dir = os.path.join(script_dir, "figures", "consensus")
 
         fig1, ax1 = plt.subplots()
 
@@ -74,9 +82,17 @@ if __name__ == "__main__":
         G.add_nodes_from(node_names)
         G.add_edges_from(edge_pairs)
 
+        node_pos = {
+            "1": (0, 0),
+            "2": (1, 0),
+            "3": (1, 1),
+            "4": (0, 1),
+            "5": (0.5, 0.5),
+        }
+
         nx.draw(
             G,
-            configs["node_pos"],
+            node_pos,
             ax=ax1,
             with_labels=True,
             node_size=1000,
@@ -91,7 +107,9 @@ if __name__ == "__main__":
 
         ax1.set_title("Graph G")
 
-        fig1.savefig(figure_path + "graph.png", dpi=300, bbox_inches="tight")
+        fig1.savefig(
+            os.path.join(figure_dir, "graph.png"), dpi=300, bbox_inches="tight"
+        )
 
         node_colors = {
             "1": "red",
@@ -104,7 +122,7 @@ if __name__ == "__main__":
         fig2, ax2 = plt.subplots()
 
         states_dict: Dict[str, NDArray[np.float64]] = {
-            name: np.load(configs["node_params"]["results_path"] + f"/node_{name}.npy")
+            name: np.load(os.path.join(results_dir, f"node_{name}.npy"))
             for name in node_names
         }
 
@@ -124,7 +142,6 @@ if __name__ == "__main__":
 
         ax2.set_title("Consensus")
 
-        fig2.savefig(figure_path + "consensus.png", dpi=300, bbox_inches="tight")
-
-    else:
-        raise ValueError("Invalid run type")
+        fig2.savefig(
+            os.path.join(figure_dir, "consensus.png"), dpi=300, bbox_inches="tight"
+        )
