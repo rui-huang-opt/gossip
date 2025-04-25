@@ -42,7 +42,7 @@ if __name__ == "__main__":
     script_type = "plot"  # "test" or "plot"
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    results_dir = os.path.join(script_dir, "results", "consensus")
+    results_dir = os.path.join(script_dir, "results", "sync_consensus")
 
     node_names = ["1", "2", "3", "4", "5"]
     edge_pairs = [("1", "2"), ("2", "3"), ("3", "4"), ("4", "5"), ("5", "1")]
@@ -70,7 +70,8 @@ if __name__ == "__main__":
             node.join()
 
     elif script_type == "plot":
-        figure_dir = os.path.join(script_dir, "figures", "consensus")
+        figure_dir = os.path.join(script_dir, "figures", "sync_consensus")
+        os.makedirs(figure_dir, exist_ok=True)
 
         fig1, ax1 = plt.subplots()
 
@@ -136,8 +137,8 @@ if __name__ == "__main__":
 
         ax2.legend(loc="upper right")
 
-        ax2.set_title("Consensus")
+        ax2.set_title("Synchronous Consensus")
 
         fig2.savefig(
-            os.path.join(figure_dir, "consensus.png"), dpi=300, bbox_inches="tight"
+            os.path.join(figure_dir, "sync_consensus.png"), dpi=300, bbox_inches="tight"
         )
