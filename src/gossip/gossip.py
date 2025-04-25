@@ -24,6 +24,14 @@ class Gossip(metaclass=ABCMeta):
         self.name = name
         self._noise_scale = noise_scale
 
+    @property
+    @abstractmethod
+    def degree(self) -> int: ...
+
+    @property
+    @abstractmethod
+    def neighbor_names(self) -> KeysView[str]: ...
+
     @abstractmethod
     def send(self, name: str, state: NDArray[np.float64]): ...
 
@@ -104,6 +112,14 @@ class AsyncGossip(Gossip):
         super().__init__(name, noise_scale)
         self._in_queues: Dict[str, Queue] = {}
         self._out_queues: Dict[str, Queue] = {}
+
+    @property
+    def degree(self) -> int:
+        return len(self._out_queues)
+    
+    @property
+    def neighbor_names(self) -> KeysView[str]:
+        return self._out_queues.keys()
 
     def send(self, name: str, state: NDArray[np.float64]):
         queue = self._out_queues.get(name)
