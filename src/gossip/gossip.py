@@ -111,12 +111,11 @@ class AsyncGossip(Gossip):
             raise ValueError(f"No connection to neighbor '{name}'")
         if queue.full():
             queue.get()
-        noise = (
-            normal(scale=self._noise_scale, size=state.shape)
-            if self._noise_scale
-            else 0
-        )
-        queue.put(state + noise)
+        if self._noise_scale:
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            queue.put(state + noise)
+        else:
+            queue.put(state)
 
     def recv(self, name: str) -> NDArray[np.float64] | None:
         queue = self._in_queues.get(name)
@@ -126,14 +125,13 @@ class AsyncGossip(Gossip):
 
     def broadcast(self, state: NDArray[np.float64]):
         for queue in self._out_queues.values():
-            noise = (
-                normal(scale=self._noise_scale, size=state.shape)
-                if self._noise_scale
-                else 0
-            )
             if queue.full():
                 queue.get()
-            queue.put(state + noise)
+            if self._noise_scale:
+                noise = normal(scale=self._noise_scale, size=state.shape)
+                queue.put(state + noise)
+            else:
+                queue.put(state)
 
     def gather(self) -> List[NDArray[np.float64]]:
         return [queue.get() for queue in self._in_queues.values() if not queue.empty()]
