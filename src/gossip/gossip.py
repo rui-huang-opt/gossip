@@ -66,24 +66,22 @@ class SyncGossip(Gossip):
         return self._connections.keys()
 
     def send(self, name: str, state: NDArray[np.float64]):
-        noise = (
-            normal(scale=self._noise_scale, size=state.shape)
-            if self._noise_scale
-            else 0
-        )
-        self._connections[name].send(state + noise)
+        if self._noise_scale:
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            self._connections[name].send(state + noise)
+        else:
+            self._connections[name].send(state)
 
     def recv(self, name: str) -> NDArray[np.float64]:
         return self._connections[name].recv()
 
     def broadcast(self, state: NDArray[np.float64]):
-        noise = (
-            normal(scale=self._noise_scale, size=state.shape)
-            if self._noise_scale
-            else 0
-        )
         for conn in self._connections.values():
-            conn.send(state + noise)
+            if self._noise_scale:
+                noise = normal(scale=self._noise_scale, size=state.shape)
+                conn.send(state + noise)
+            else:
+                conn.send(state)
 
     def gather(self) -> List[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
