@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from typing import Dict, List
 from multiprocessing.synchronize import Event, Barrier
 from numpy.typing import NDArray
-from gossip import create_gossip_network, Gossip
+from gossip import Gossip, create_async_network
 
 
 class Node(mp.Process):
@@ -79,9 +79,7 @@ if __name__ == "__main__":
             "stop_event": event,
             "start_barrier": barrier,
         }
-        gossip_network = create_gossip_network(
-            node_names, edge_pairs, is_async=True, maxsize=50
-        )
+        gossip_network = create_async_network(node_names, edge_pairs, maxsize=50)
 
         consensus_nodes = [
             Node(gossip_network[name], initial_states[name], **node_params)

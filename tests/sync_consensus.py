@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from typing import Dict
 from numpy.typing import NDArray
 from multiprocessing import Process
-from gossip import create_gossip_network, Gossip
+from gossip import Gossip, create_sync_network
 
 
 class Node(Process):
@@ -56,7 +56,7 @@ if __name__ == "__main__":
             "5": np.array([20.9, 30.8, 40.7]),
         }
         node_params = {"max_iter": 50, "step_size": 0.5, "results_path": results_dir}
-        gossip_network = create_gossip_network(node_names, edge_pairs, noise_scale=0.1)
+        gossip_network = create_sync_network(node_names, edge_pairs, noise_scale=0.1)
 
         consensus_nodes = [
             Node(gossip_network[name], initial_states[name], **node_params)
