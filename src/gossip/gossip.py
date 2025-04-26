@@ -39,7 +39,16 @@ class Gossip(metaclass=ABCMeta):
     def recv(self, name: str) -> NDArray[np.float64]: ...
 
     @abstractmethod
-    def broadcast(self, state: NDArray[np.float64]): ...
+    def _broadcast_with_noise(self, state: NDArray[np.float64]): ...
+
+    @abstractmethod
+    def _broadcast_without_noise(self, state: NDArray[np.float64]): ...
+
+    def broadcast(self, state: NDArray[np.float64]):
+        if self._noise_scale:
+            self._broadcast_with_noise(state)
+        else:
+            self._broadcast_without_noise(state)
 
     @abstractmethod
     def gather(self) -> List[NDArray[np.float64]]: ...
@@ -83,13 +92,14 @@ class SyncGossip(Gossip):
     def recv(self, name: str) -> NDArray[np.float64]:
         return self._connections[name].recv()
 
-    def broadcast(self, state: NDArray[np.float64]):
+    def _broadcast_with_noise(self, state: NDArray[np.float64]):
         for conn in self._connections.values():
-            if self._noise_scale:
-                noise = normal(scale=self._noise_scale, size=state.shape)
-                conn.send(state + noise)
-            else:
-                conn.send(state)
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            conn.send(state + noise)
+
+    def _broadcast_without_noise(self, state: NDArray[np.float64]):
+        for conn in self._connections.values():
+            conn.send(state)
 
     def gather(self) -> List[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
@@ -116,7 +126,7 @@ class AsyncGossip(Gossip):
     @property
     def degree(self) -> int:
         return len(self._out_queues)
-    
+
     @property
     def neighbor_names(self) -> KeysView[str]:
         return self._out_queues.keys()
@@ -139,15 +149,18 @@ class AsyncGossip(Gossip):
             raise ValueError(f"No connection from neighbor '{name}'")
         return queue.get() if not queue.empty() else None
 
-    def broadcast(self, state: NDArray[np.float64]):
+    def _broadcast_with_noise(self, state: NDArray[np.float64]):
         for queue in self._out_queues.values():
             if queue.full():
                 queue.get()
-            if self._noise_scale:
-                noise = normal(scale=self._noise_scale, size=state.shape)
-                queue.put(state + noise)
-            else:
-                queue.put(state)
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            queue.put(state + noise)
+
+    def _broadcast_without_noise(self, state: NDArray[np.float64]):
+        for queue in self._out_queues.values():
+            if queue.full():
+                queue.get()
+            queue.put(state)
 
     def gather(self) -> List[NDArray[np.float64]]:
         return [queue.get() for queue in self._in_queues.values() if not queue.empty()]
