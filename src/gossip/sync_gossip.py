@@ -16,26 +16,26 @@ class SyncGossip(Gossip[Connection]):
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
 
-    def send(self, name: str, state: NDArray[np.float64], *args, **kwargs):
+    def send(self, name: str, state: NDArray[np.float64], index: int = 0):
         if self._noise_scale:
             noise = normal(scale=self._noise_scale, size=state.shape)
             self._connections[name].send(state + noise)
         else:
             self._connections[name].send(state)
 
-    def recv(self, name: str, *args, **kwargs) -> NDArray[np.float64] | None:
+    def recv(self, name: str, index: int = 0) -> NDArray[np.float64] | None:
         return self._connections[name].recv()
 
-    def _broadcast_with_noise(self, state: NDArray[np.float64], *args, **kwargs):
+    def _broadcast_with_noise(self, state: NDArray[np.float64], index: int = 0):
         for conn in self._connections.values():
             noise = normal(scale=self._noise_scale, size=state.shape)
             conn.send(state + noise)
 
-    def _broadcast_without_noise(self, state: NDArray[np.float64], *args, **kwargs):
+    def _broadcast_without_noise(self, state: NDArray[np.float64], index: int = 0):
         for conn in self._connections.values():
             conn.send(state)
 
-    def gather(self, *args, **kwargs) -> List[NDArray[np.float64]]:
+    def gather(self, index: int = 0) -> List[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
 
     def close(self):

@@ -6,14 +6,43 @@ from multiprocessing import Queue
 from .gossip import Gossip
 
 
-class Connection(NamedTuple):
+class Channel(NamedTuple):
     """
-    A named tuple representing a communication connection.
-    It contains an input queue and an output queue for asynchronous communication.
+    A named tuple representing a communication channel.
+    It contains an input and output queue for asynchronous communication.
     """
 
     in_queue: Queue
     out_queue: Queue
+
+
+class Connection:
+    """
+    A class representing a connection between two nodes in the gossip network.
+    It contains two queues for input and output communication.
+    """
+
+    def __init__(self, *channels: Channel):
+        self._channels: Tuple[Channel, ...] = channels
+
+    def full(self, index: int) -> bool:
+        return self._channels[index].out_queue.full()
+
+    def empty(self, index: int) -> bool:
+        return self._channels[index].in_queue.empty()
+
+    def send(self, state: NDArray[np.float64], index: int):
+        if self._channels[index].out_queue.full():
+            self._channels[index].out_queue.get()
+        self._channels[index].out_queue.put(state)
+
+    def recv(self, index: int) -> NDArray[np.float64]:
+        return self._channels[index].in_queue.get()
+
+    def close(self):
+        for channel in self._channels:
+            channel.in_queue.close()
+            channel.out_queue.close()
 
 
 class AsyncGossip(Gossip[Connection]):
@@ -25,52 +54,43 @@ class AsyncGossip(Gossip[Connection]):
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
 
-    def send(self, name: str, state: NDArray[np.float64], *args, **kwargs):
+    def send(self, name: str, state: NDArray[np.float64], index: int = 0):
         connection = self._connections.get(name)
         if connection is None:
             raise ValueError(f"No connection to neighbor '{name}'")
-        if connection.out_queue.full():
-            connection.out_queue.get()
         if self._noise_scale:
             noise = normal(scale=self._noise_scale, size=state.shape)
-            connection.out_queue.put(state + noise)
+            connection.send(state + noise, index)
         else:
-            connection.out_queue.put(state)
+            connection.send(state, index)
 
-    def recv(self, name: str, *args, **kwargs) -> NDArray[np.float64] | None:
+    def recv(self, name: str, index: int = 0) -> NDArray[np.float64] | None:
         connection = self._connections.get(name)
         if connection is None:
             raise ValueError(f"No connection to neighbor '{name}'")
-        return connection.in_queue.get() if not connection.in_queue.empty() else None
+        return connection.recv(index) if not connection.empty(index) else None
 
-    def _broadcast_with_noise(self, state: NDArray[np.float64], *args, **kwargs):
+    def _broadcast_with_noise(self, state: NDArray[np.float64], index: int = 0):
         for connection in self._connections.values():
-            if connection.out_queue.full():
-                connection.out_queue.get()
             noise = normal(scale=self._noise_scale, size=state.shape)
-            connection.out_queue.put(state + noise)
+            connection.send(state + noise, index)
 
-    def _broadcast_without_noise(self, state: NDArray[np.float64], *args, **kwargs):
+    def _broadcast_without_noise(self, state: NDArray[np.float64], index: int = 0):
         for connection in self._connections.values():
-            if connection.out_queue.full():
-                connection.out_queue.get()
-            connection.out_queue.put(state)
+            connection.send(state, index)
 
-    def gather(self, *args, **kwargs) -> List[NDArray[np.float64]]:
+    def gather(self, index: int = 0) -> List[NDArray[np.float64]]:
         return [
-            connection.in_queue.get()
+            connection.recv(index)
             for connection in self._connections.values()
-            if not connection.in_queue.empty()
+            if not connection.empty(index)
         ]
 
     def close(self):
         for connection in self._connections.values():
-            while not connection.in_queue.empty():
-                connection.in_queue.get()
-            while not connection.out_queue.empty():
-                connection.out_queue.get()
-            connection.in_queue.close()
-            connection.out_queue.close()
+            while not connection.empty():
+                connection.recv()
+            connection.close()
 
 
 def create_async_network(
@@ -78,6 +98,7 @@ def create_async_network(
     edge_pairs: List[Tuple[str, str]],
     noise_scale: int | float | None = None,
     maxsize: int = 10,
+    n_channels: int = 1,
 ) -> Dict[str, Gossip]:
     """
     Create a network of gossip nodes with asynchronous communication.
@@ -95,9 +116,15 @@ def create_async_network(
     gossip_map = {name: AsyncGossip(name, noise_scale) for name in node_names}
 
     for u, v in edge_pairs:
-        queue_u, queue_v = Queue(maxsize=maxsize), Queue(maxsize=maxsize)
-        conn_u = Connection(queue_u, queue_v)
-        conn_v = Connection(queue_v, queue_u)
+        channels_u = [
+            Channel(Queue(maxsize=maxsize), Queue(maxsize=maxsize))
+            for _ in range(n_channels)
+        ]
+        channels_v = [
+            Channel(channel.out_queue, channel.in_queue) for channel in channels_u
+        ]
+        conn_u = Connection(*channels_u)
+        conn_v = Connection(*channels_v)
         gossip_map[u].add_connection(v, conn_u)
         gossip_map[v].add_connection(u, conn_v)
 

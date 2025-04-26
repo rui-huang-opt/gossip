@@ -30,25 +30,25 @@ class Gossip(Generic[T], metaclass=ABCMeta):
         return self._connections.keys()
 
     @abstractmethod
-    def send(self, name: str, state: NDArray[np.float64], *args, **kwargs): ...
+    def send(self, name: str, state: NDArray[np.float64], index: int = 0): ...
 
     @abstractmethod
-    def recv(self, name: str, *args, **kwargs) -> NDArray[np.float64] | None: ...
+    def recv(self, name: str, index: int = 0) -> NDArray[np.float64] | None: ...
 
     @abstractmethod
-    def _broadcast_with_noise(self, state: NDArray[np.float64], *args, **kwargs): ...
+    def _broadcast_with_noise(self, state: NDArray[np.float64], index: int = 0): ...
 
     @abstractmethod
-    def _broadcast_without_noise(self, state: NDArray[np.float64], *args, **kwargs): ...
+    def _broadcast_without_noise(self, state: NDArray[np.float64], index: int = 0): ...
 
-    def broadcast(self, state: NDArray[np.float64], *args, **kwargs):
+    def broadcast(self, state: NDArray[np.float64], index: int = 0):
         if self._noise_scale:
-            self._broadcast_with_noise(state, *args, **kwargs)
+            self._broadcast_with_noise(state, index)
         else:
-            self._broadcast_without_noise(state, *args, **kwargs)
+            self._broadcast_without_noise(state, index)
 
     @abstractmethod
-    def gather(self, *args, **kwargs) -> List[NDArray[np.float64]]: ...
+    def gather(self, index: int = 0) -> List[NDArray[np.float64]]: ...
 
     def add_connection(self, neighbor: str, conn: T):
         if neighbor in self._connections:
@@ -64,9 +64,9 @@ class Gossip(Generic[T], metaclass=ABCMeta):
     def close(self): ...
 
     def compute_laplacian(
-        self, state: NDArray[np.float64], *args, **kwargs
+        self, state: NDArray[np.float64], index: int = 0
     ) -> NDArray[np.float64]:
-        self.broadcast(state, *args, **kwargs)
-        neighbor_states = self.gather(*args, **kwargs)
+        self.broadcast(state, index)
+        neighbor_states = self.gather(index)
 
         return len(neighbor_states) * state - sum(neighbor_states)
