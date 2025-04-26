@@ -2,7 +2,7 @@ import numpy as np
 from numpy.typing import NDArray
 from numpy.random import normal
 from abc import ABCMeta, abstractmethod
-from typing import List, Tuple, Dict, KeysView, TypeVar, Generic
+from typing import List, Tuple, Dict, KeysView, NamedTuple
 from multiprocessing import Pipe, Queue
 from multiprocessing.connection import Connection
 
@@ -119,6 +119,16 @@ class SyncGossip(Gossip):
             conn.close()
 
 
+class Channel(NamedTuple):
+    """
+    A named tuple representing a communication channel.
+    It contains an input queue and an output queue for asynchronous communication.
+    """
+
+    in_queue: Queue
+    out_queue: Queue
+
+
 class AsyncGossip(Gossip):
     """
     Asynchronous gossip communication using multiprocessing queues.
@@ -127,72 +137,70 @@ class AsyncGossip(Gossip):
 
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
-        self._in_queues: Dict[str, Queue] = {}
-        self._out_queues: Dict[str, Queue] = {}
+        self._channels: Dict[str, Channel] = {}
 
     @property
     def degree(self) -> int:
-        return len(self._out_queues)
+        return len(self._channels)
 
     @property
     def neighbor_names(self) -> KeysView[str]:
-        return self._out_queues.keys()
+        return self._channels.keys()
 
     def send(self, name: str, state: NDArray[np.float64]):
-        queue = self._out_queues.get(name)
-        if queue is None:
+        channel = self._channels.get(name)
+        if channel is None:
             raise ValueError(f"No connection to neighbor '{name}'")
-        if queue.full():
-            queue.get()
+        if channel.out_queue.full():
+            channel.out_queue.get()
         if self._noise_scale:
             noise = normal(scale=self._noise_scale, size=state.shape)
-            queue.put(state + noise)
+            channel.out_queue.put(state + noise)
         else:
-            queue.put(state)
+            channel.out_queue.put(state)
 
     def recv(self, name: str) -> NDArray[np.float64] | None:
-        queue = self._in_queues.get(name)
-        if queue is None:
-            raise ValueError(f"No connection from neighbor '{name}'")
-        return queue.get() if not queue.empty() else None
+        channel = self._channels.get(name)
+        if channel is None:
+            raise ValueError(f"No connection to neighbor '{name}'")
+        return channel.in_queue.get() if not channel.in_queue.empty() else None
 
     def _broadcast_with_noise(self, state: NDArray[np.float64]):
-        for queue in self._out_queues.values():
-            if queue.full():
-                queue.get()
+        for channel in self._channels.values():
+            if channel.out_queue.full():
+                channel.out_queue.get()
             noise = normal(scale=self._noise_scale, size=state.shape)
-            queue.put(state + noise)
+            channel.out_queue.put(state + noise)
 
     def _broadcast_without_noise(self, state: NDArray[np.float64]):
-        for queue in self._out_queues.values():
-            if queue.full():
-                queue.get()
-            queue.put(state)
+        for channel in self._channels.values():
+            if channel.out_queue.full():
+                channel.out_queue.get()
+            channel.out_queue.put(state)
 
     def gather(self) -> List[NDArray[np.float64]]:
-        return [queue.get() for queue in self._in_queues.values() if not queue.empty()]
+        return [
+            channel.in_queue.get() for channel in self._channels.values() if not channel.in_queue.empty()
+        ]
 
     def add_connection(self, neighbor: str, in_queue: Queue, out_queue: Queue):
-        if neighbor in self._in_queues or neighbor in self._out_queues:
+        if neighbor in self._channels:
             raise ValueError(f"Connection to neighbor '{neighbor}' already exists")
-        self._in_queues[neighbor] = in_queue
-        self._out_queues[neighbor] = out_queue
+        self._channels[neighbor] = Channel(in_queue, out_queue)
 
     def remove_connection(self, neighbor: str):
-        if neighbor not in self._in_queues or neighbor not in self._out_queues:
-            raise ValueError(f"No connection to neighbor '{neighbor}' to remove")
-        self._in_queues.pop(neighbor)
-        self._out_queues.pop(neighbor)
+        if neighbor not in self._channels:
+            raise ValueError(f"No connection to neighbor '{neighbor}'")
+        self._channels.pop(neighbor)
 
     def close(self):
-        for queue in self._in_queues.values():
-            while not queue.empty():
-                queue.get()
-            queue.close()
-        for queue in self._out_queues.values():
-            while not queue.empty():
-                queue.get()
-            queue.close()
+        for channel in self._channels.values():
+            while not channel.in_queue.empty():
+                channel.in_queue.get()
+            while not channel.out_queue.empty():
+                channel.out_queue.get()
+            channel.in_queue.close()
+            channel.out_queue.close()
 
 
 def create_gossip_network(
