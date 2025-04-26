@@ -1,10 +1,12 @@
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABCMeta, abstractmethod
-from typing import List, KeysView
+from typing import List, KeysView, TypeVar, Generic, Dict
+
+T = TypeVar("T")
 
 
-class Gossip(metaclass=ABCMeta):
+class Gossip(Generic[T], metaclass=ABCMeta):
     """
     Abstract base class for gossip communication.
     This class defines the interface for both synchronous and asynchronous gossip communication.
@@ -17,14 +19,15 @@ class Gossip(metaclass=ABCMeta):
     ):
         self.name = name
         self._noise_scale = noise_scale
+        self._connections: Dict[str, T] = {}
 
     @property
-    @abstractmethod
-    def degree(self) -> int: ...
+    def degree(self) -> int:
+        return len(self._connections)
 
     @property
-    @abstractmethod
-    def neighbor_names(self) -> KeysView[str]: ...
+    def neighbor_names(self) -> KeysView[str]:
+        return self._connections.keys()
 
     @abstractmethod
     def send(self, name: str, state: NDArray[np.float64]): ...
@@ -47,11 +50,15 @@ class Gossip(metaclass=ABCMeta):
     @abstractmethod
     def gather(self) -> List[NDArray[np.float64]]: ...
 
-    @abstractmethod
-    def add_connection(self, neighbor: str, *args, **kwargs): ...
+    def add_connection(self, neighbor: str, conn: T):
+        if neighbor in self._connections:
+            raise ValueError(f"Connection to neighbor '{neighbor}' already exists")
+        self._connections[neighbor] = conn
 
-    @abstractmethod
-    def remove_connection(self, neighbor: str): ...
+    def remove_connection(self, neighbor: str):
+        if neighbor not in self._connections:
+            raise ValueError(f"No connection to neighbor '{neighbor}'")
+        self._connections.pop(neighbor)
 
     @abstractmethod
     def close(self): ...

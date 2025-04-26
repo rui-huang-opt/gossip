@@ -7,7 +7,7 @@ from multiprocessing.connection import Connection
 from .gossip import Gossip
 
 
-class SyncGossip(Gossip):
+class SyncGossip(Gossip[Connection]):
     """
     Synchronous gossip communication using multiprocessing pipes.
     This class implements the Gossip interface for synchronous communication.
@@ -15,15 +15,6 @@ class SyncGossip(Gossip):
 
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
-        self._connections: Dict[str, Connection] = {}
-
-    @property
-    def degree(self) -> int:
-        return len(self._connections)
-
-    @property
-    def neighbor_names(self) -> KeysView[str]:
-        return self._connections.keys()
 
     def send(self, name: str, state: NDArray[np.float64]):
         if self._noise_scale:
@@ -46,12 +37,6 @@ class SyncGossip(Gossip):
 
     def gather(self) -> List[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
-
-    def add_connection(self, neighbor: str, conn: Connection):
-        self._connections[neighbor] = conn
-
-    def remove_connection(self, neighbor: str):
-        self._connections.pop(neighbor, None)
 
     def close(self):
         for conn in self._connections.values():
