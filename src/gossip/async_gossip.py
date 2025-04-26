@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from numpy.random import normal
-from typing import List, Tuple, Dict, KeysView, NamedTuple
+from typing import List, Tuple, Dict, NamedTuple
 from multiprocessing import Queue
 from .gossip import Gossip
 
@@ -25,7 +25,7 @@ class AsyncGossip(Gossip[Connection]):
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
 
-    def send(self, name: str, state: NDArray[np.float64]):
+    def send(self, name: str, state: NDArray[np.float64], *args, **kwargs):
         connection = self._connections.get(name)
         if connection is None:
             raise ValueError(f"No connection to neighbor '{name}'")
@@ -37,26 +37,26 @@ class AsyncGossip(Gossip[Connection]):
         else:
             connection.out_queue.put(state)
 
-    def recv(self, name: str) -> NDArray[np.float64] | None:
+    def recv(self, name: str, *args, **kwargs) -> NDArray[np.float64] | None:
         connection = self._connections.get(name)
         if connection is None:
             raise ValueError(f"No connection to neighbor '{name}'")
         return connection.in_queue.get() if not connection.in_queue.empty() else None
 
-    def _broadcast_with_noise(self, state: NDArray[np.float64]):
+    def _broadcast_with_noise(self, state: NDArray[np.float64], *args, **kwargs):
         for connection in self._connections.values():
             if connection.out_queue.full():
                 connection.out_queue.get()
             noise = normal(scale=self._noise_scale, size=state.shape)
             connection.out_queue.put(state + noise)
 
-    def _broadcast_without_noise(self, state: NDArray[np.float64]):
+    def _broadcast_without_noise(self, state: NDArray[np.float64], *args, **kwargs):
         for connection in self._connections.values():
             if connection.out_queue.full():
                 connection.out_queue.get()
             connection.out_queue.put(state)
 
-    def gather(self) -> List[NDArray[np.float64]]:
+    def gather(self, *args, **kwargs) -> List[NDArray[np.float64]]:
         return [
             connection.in_queue.get()
             for connection in self._connections.values()

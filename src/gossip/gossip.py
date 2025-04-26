@@ -30,25 +30,25 @@ class Gossip(Generic[T], metaclass=ABCMeta):
         return self._connections.keys()
 
     @abstractmethod
-    def send(self, name: str, state: NDArray[np.float64]): ...
+    def send(self, name: str, state: NDArray[np.float64], *args, **kwargs): ...
 
     @abstractmethod
-    def recv(self, name: str) -> NDArray[np.float64]: ...
+    def recv(self, name: str, *args, **kwargs) -> NDArray[np.float64] | None: ...
 
     @abstractmethod
-    def _broadcast_with_noise(self, state: NDArray[np.float64]): ...
+    def _broadcast_with_noise(self, state: NDArray[np.float64], *args, **kwargs): ...
 
     @abstractmethod
-    def _broadcast_without_noise(self, state: NDArray[np.float64]): ...
+    def _broadcast_without_noise(self, state: NDArray[np.float64], *args, **kwargs): ...
 
-    def broadcast(self, state: NDArray[np.float64]):
+    def broadcast(self, state: NDArray[np.float64], *args, **kwargs):
         if self._noise_scale:
-            self._broadcast_with_noise(state)
+            self._broadcast_with_noise(state, *args, **kwargs)
         else:
-            self._broadcast_without_noise(state)
+            self._broadcast_without_noise(state, *args, **kwargs)
 
     @abstractmethod
-    def gather(self) -> List[NDArray[np.float64]]: ...
+    def gather(self, *args, **kwargs) -> List[NDArray[np.float64]]: ...
 
     def add_connection(self, neighbor: str, conn: T):
         if neighbor in self._connections:
@@ -63,8 +63,10 @@ class Gossip(Generic[T], metaclass=ABCMeta):
     @abstractmethod
     def close(self): ...
 
-    def compute_laplacian(self, state: NDArray[np.float64]) -> NDArray[np.float64]:
-        self.broadcast(state)
-        neighbor_states = self.gather()
+    def compute_laplacian(
+        self, state: NDArray[np.float64], *args, **kwargs
+    ) -> NDArray[np.float64]:
+        self.broadcast(state, *args, **kwargs)
+        neighbor_states = self.gather(*args, **kwargs)
 
         return len(neighbor_states) * state - sum(neighbor_states)
