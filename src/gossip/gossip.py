@@ -9,11 +9,8 @@ from multiprocessing.connection import Connection
 
 class Gossip(metaclass=ABCMeta):
     """
-    A class to manage the gossip protocol for a node in a distributed network.
-
-    This class manages communication between nodes in a gossip network.
-    It allows sending and receiving messages to/from neighbors, broadcasting
-    messages to all neighbors, and gathering messages from all neighbors.
+    Abstract base class for gossip communication.
+    This class defines the interface for both synchronous and asynchronous gossip communication.
     """
 
     def __init__(
@@ -70,6 +67,11 @@ class Gossip(metaclass=ABCMeta):
 
 
 class SyncGossip(Gossip):
+    """
+    Synchronous gossip communication using multiprocessing pipes.
+    This class implements the Gossip interface for synchronous communication.
+    """
+
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
         self._connections: Dict[str, Connection] = {}
@@ -118,6 +120,11 @@ class SyncGossip(Gossip):
 
 
 class AsyncGossip(Gossip):
+    """
+    Asynchronous gossip communication using multiprocessing queues.
+    This class implements the Gossip interface for asynchronous communication.
+    """
+
     def __init__(self, name: str, noise_scale: int | float | None = None):
         super().__init__(name, noise_scale)
         self._in_queues: Dict[str, Queue] = {}
