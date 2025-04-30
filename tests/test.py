@@ -68,13 +68,16 @@ class Subscriber:
         self,
         node_handler: NodeHandle,
         topic: str,
-        callback: Callable[[Queue[List[np.float64]]], None],
         queue_size: int = 10,
     ):
         self._topic_dict = node_handler._topic_dict
         self._topic = topic
-        self._callback = callback
-        self._queue = Queue(maxsize=queue_size)
+        self._queue: Queue[List[np.float64]] = Queue(maxsize=queue_size)
+
+    def subscribe(self) -> List[np.float64] | None:
+        if self._queue.empty():
+            return None
+        return self._queue.get()
 
     def backend(self):
         while True:
@@ -83,7 +86,6 @@ class Subscriber:
             if self._queue.full():
                 self._queue.get()
             self._queue.put(message.data)
-            self._callback(self._queue)
             message.event.clear()
 
     def init(self):
@@ -119,7 +121,7 @@ class SubNode(mp.Process):
     def __init__(self, node_handler: NodeHandle):
         super().__init__()
 
-        self._subscriber = Subscriber(node_handler, "array", lambda q: print(q.get()))
+        self._subscriber = Subscriber(node_handler, "array")
 
         self._stop_event = node_handler.stop_event
 
@@ -129,6 +131,9 @@ class SubNode(mp.Process):
 
     def main(self):
         while not self._stop_event.is_set():
+            data = self._subscriber.subscribe()
+            if data is not None:
+                print(f"Subscriber received data: {data}")
             time.sleep(0.1)
         print("Subscriber stopped.")
 
@@ -139,15 +144,19 @@ class SubNode(mp.Process):
 
 if __name__ == "__main__":
     nh = NodeHandle()
-    pub_node = PubNode(nh, 50)
-    sub_node = SubNode(nh)
+    pub_node = PubNode(nh, 5)
+    sub_node_1 = SubNode(nh)
+    sub_node_2 = SubNode(nh)
+
     pub_node.start()
-    sub_node.start()
+    sub_node_1.start()
+    sub_node_2.start()
 
     time.sleep(5)
     nh.stop()
 
     pub_node.join()
-    sub_node.join()
+    sub_node_1.join()
+    sub_node_2.join()
 
     print("Main process finished.")
