@@ -16,8 +16,8 @@ class Message(NamedTuple):
 
 
 class NodeHandle:
-    def __init__(self, stop_event: Event):
-        self.stop_event = stop_event
+    def __init__(self, stop_event: Event = None):
+        self.stop_event = stop_event if stop_event else mp.Event()
         self._manager = mp.Manager()
         self._topic_dict: Dict[str, Message] = self._manager.dict()
 
@@ -138,7 +138,7 @@ class SubNode(mp.Process):
 
 
 if __name__ == "__main__":
-    nh = NodeHandle(mp.Event())
+    nh = NodeHandle()
     pub_node = PubNode(nh, 50)
     sub_node = SubNode(nh)
     pub_node.start()
