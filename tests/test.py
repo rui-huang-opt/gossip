@@ -2,7 +2,7 @@ import time
 import threading as th
 import multiprocessing as mp
 import numpy as np
-from typing import Dict, NamedTuple, Callable
+from typing import Dict, NamedTuple, Callable, List
 from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event
 from multiprocessing.managers import ListProxy
@@ -65,7 +65,7 @@ class Subscriber:
         self,
         node_handler: NodeHandler,
         topic: str,
-        callback: Callable[[Queue[NDArray[np.float64]]], None],
+        callback: Callable[[Queue[List[np.float64]]], None],
         queue_size: int = 10,
     ):
         self._topic_dict = node_handler._topic_dict
@@ -79,7 +79,7 @@ class Subscriber:
             message.event.wait()
             if self._queue.full():
                 self._queue.get()
-            self._queue.put(message.data[:])
+            self._queue.put(message.data)
             self._callback(self._queue)
             message.event.clear()
 
