@@ -15,7 +15,7 @@ class Message(NamedTuple):
     event: Event
 
 
-class NodeHandler:
+class NodeHandle:
     def __init__(self, stop_event: Event):
         self.stop_event = stop_event
         self._manager = mp.Manager()
@@ -38,7 +38,7 @@ class NodeHandler:
 
 class Publisher:
     def __init__(
-        self, node_handler: NodeHandler, topic: str, dim: int = 3, queue_size: int = 10
+        self, node_handler: NodeHandle, topic: str, dim: int = 3, queue_size: int = 10
     ):
         node_handler.register_topic(topic, dim)
         self._topic_dict = node_handler._topic_dict
@@ -66,7 +66,7 @@ class Publisher:
 class Subscriber:
     def __init__(
         self,
-        node_handler: NodeHandler,
+        node_handler: NodeHandle,
         topic: str,
         callback: Callable[[Queue[List[np.float64]]], None],
         queue_size: int = 10,
@@ -92,43 +92,54 @@ class Subscriber:
 
 
 class PubNode(mp.Process):
-    def __init__(self, node_handler: NodeHandler):
+    def __init__(self, node_handler: NodeHandle, dim: int = 3):
         super().__init__()
 
-        self._publisher = Publisher(node_handler, "array")
+        self._dim = dim
+        self._publisher = Publisher(node_handler, "array", dim=dim)
         self._stop_event = node_handler.stop_event
 
-    def run(self):
+    def init(self):
         self._publisher.init()
         print("Publisher initialized.")
 
+    def main(self):
         while not self._stop_event.is_set():
-            data = np.random.rand(3)
+            data = np.random.rand(self._dim)
             self._publisher.publish(data)
-            time.sleep(0.1)
+            time.sleep(0.01)
         print("Publisher stopped.")
+
+    def run(self):
+        self.init()
+        self.main()
 
 
 class SubNode(mp.Process):
-    def __init__(self, node_handler: NodeHandler):
+    def __init__(self, node_handler: NodeHandle):
         super().__init__()
 
         self._subscriber = Subscriber(node_handler, "array", lambda q: print(q.get()))
 
         self._stop_event = node_handler.stop_event
 
-    def run(self):
+    def init(self):
         self._subscriber.init()
         print("Subscriber initialized.")
 
+    def main(self):
         while not self._stop_event.is_set():
             time.sleep(0.1)
         print("Subscriber stopped.")
 
+    def run(self):
+        self.init()
+        self.main()
+
 
 if __name__ == "__main__":
-    nh = NodeHandler(mp.Event())
-    pub_node = PubNode(nh)
+    nh = NodeHandle(mp.Event())
+    pub_node = PubNode(nh, 50)
     sub_node = SubNode(nh)
     pub_node.start()
     sub_node.start()
