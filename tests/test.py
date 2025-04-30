@@ -3,7 +3,6 @@ import threading as th
 import multiprocessing as mp
 import numpy as np
 from typing import Dict, NamedTuple, Callable, List
-from multiprocessing.shared_memory import SharedMemory
 from multiprocessing.synchronize import Event
 from multiprocessing.managers import ListProxy
 from queue import Queue
@@ -11,6 +10,7 @@ from numpy.typing import NDArray
 
 
 class Message(NamedTuple):
+    dim: int
     data: ListProxy
     event: Event
 
@@ -24,6 +24,7 @@ class NodeHandler:
     def register_topic(self, topic: str, dim: int):
         if topic not in self._topic_dict:
             self._topic_dict[topic] = Message(
+                dim=dim,
                 data=self._manager.list([0.0] * dim),
                 event=self._manager.Event(),
             )
@@ -36,8 +37,10 @@ class NodeHandler:
 
 
 class Publisher:
-    def __init__(self, node_handler: NodeHandler, topic: str, queue_size: int = 10):
-        node_handler.register_topic(topic, 3)
+    def __init__(
+        self, node_handler: NodeHandler, topic: str, dim: int = 3, queue_size: int = 10
+    ):
+        node_handler.register_topic(topic, dim)
         self._topic_dict = node_handler._topic_dict
         self._topic = topic
         self._queue = Queue(maxsize=queue_size)
@@ -110,9 +113,7 @@ class SubNode(mp.Process):
     def __init__(self, node_handler: NodeHandler):
         super().__init__()
 
-        self._subscriber = Subscriber(
-            node_handler, "array", lambda q: print(q.get())
-        )
+        self._subscriber = Subscriber(node_handler, "array", lambda q: print(q.get()))
 
         self._stop_event = node_handler.stop_event
 
