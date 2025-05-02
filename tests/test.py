@@ -2,7 +2,7 @@ import time
 import threading as th
 import multiprocessing as mp
 import numpy as np
-from typing import Dict, NamedTuple, Callable, List
+from typing import Dict, NamedTuple, List
 from multiprocessing.synchronize import Event
 from multiprocessing.managers import ListProxy
 from queue import Queue
@@ -97,98 +97,71 @@ class Subscriber:
         thead.start()
 
 
-class PubNode(mp.Process):
-    def __init__(self, node_handler: NodeHandle, dim: int = 3):
-        super().__init__()
-
-        self._dim = dim
-        self._publisher = Publisher(node_handler, "array")
-        self._stop_event = node_handler.stop_event
-
-    def init(self):
-        self._publisher.init()
-        print("Publisher initialized.")
-
-    def main(self):
-        while not self._stop_event.is_set():
-            data = np.random.rand(self._dim)
-            self._publisher.publish(data)
-            time.sleep(0.01)
-        print("Publisher stopped.")
-
-    def run(self):
-        self.init()
-        self.main()
-
-
-class SubNode(mp.Process):
-    def __init__(self, node_handler: NodeHandle):
-        super().__init__()
-
-        self._subscriber = Subscriber(node_handler, "array")
-
-        self._stop_event = node_handler.stop_event
-
-    def init(self):
-        self._subscriber.init()
-        print("Subscriber initialized.")
-
-    def main(self):
-        while not self._stop_event.is_set():
-            data = self._subscriber.subscribe()
-            if data is not None:
-                print(f"Subscriber received data: {data}")
-            time.sleep(0.1)
-        print("Subscriber stopped.")
-
-    def run(self):
-        self.init()
-        self.main()
-
-
 class Gossip:
     def __init__(
         self,
         node_handle: NodeHandle,
         name: str,
+        neighbor_names: List[str] = None,
+        noise_scale: int | float | None = None,
+        maxsize: int = 10,
         n_channels: int = 1,
     ):
         self._name = name
+        self._noise_scale = noise_scale
         self._n_channels = n_channels
 
-        self._publisher = Publisher(node_handle, name)
-        self._subscribers: Dict[str, Subscriber] = {}
+        self._publishers = [
+            Publisher(node_handle, name, maxsize) for _ in range(n_channels)
+        ]
+        if neighbor_names is None:
+            self._subscribers: List[Dict[str, Subscriber]] = [
+                {} for _ in range(n_channels)
+            ]
+        else:
+            self._subscribers = [
+                {neighbor: Subscriber(node_handle, neighbor, maxsize)}
+                for neighbor in neighbor_names
+            ]
 
     def add_subscriber(self, neighbor: str, subscriber: Subscriber):
         if neighbor in self._subscribers:
             raise ValueError(f"Subscriber to neighbor '{neighbor}' already exists")
         self._subscribers[neighbor] = subscriber
 
-    def broadcast(self, data: NDArray[np.float64]):
-        self._publisher.publish(data)
+    def broadcast(self, data: NDArray[np.float64], index: int = 0):
+        if self._noise_scale:
+            noise = np.random.normal(scale=self._noise_scale, size=data.shape)
+            self._publishers[index].publish(data + noise)
+        else:
+            self._publishers[index].publish(data)
 
-    def gather(self) -> List[NDArray[np.float64]]:
+    def gather(self, index: int = 0) -> List[NDArray[np.float64]]:
         data = []
-        for subscriber in self._subscribers.values():
+        for subscriber in self._subscribers[index].values():
             received_data = subscriber.subscribe()
             if received_data is not None:
                 data.append(np.array(received_data))
         return data
 
-    def compute_laplacian(self, state: NDArray[np.float64]) -> NDArray[np.float64]:
-        self.broadcast(state)
-        neighbor_states = self.gather()
+    def compute_laplacian(
+        self, state: NDArray[np.float64], index: int = 0
+    ) -> NDArray[np.float64]:
+        self.broadcast(state, index)
+        neighbor_states = self.gather(index)
         return len(neighbor_states) * state - sum(neighbor_states)
 
     def clear(self):
-        self._publisher.clear()
-        for subscriber in self._subscribers.values():
-            subscriber.clear()
+        for i in range(self._n_channels):
+            self._publishers[i].clear()
+            for subscriber in self._subscribers[i].values():
+                subscriber.clear()
 
     def init(self):
-        self._publisher.init()
-        for subscriber in self._subscribers.values():
-            subscriber.init()
+        for i in range(self._n_channels):
+            self._publishers[i].init()
+            for subscriber in self._subscribers[i].values():
+                subscriber.init()
         print(f"Gossip {self._name} initialized.")
 
 
@@ -200,15 +173,24 @@ def create_async_network(
     maxsize: int = 10,
     n_channels: int = 1,
 ) -> Dict[str, Gossip]:
-    network: Dict[str, Gossip] = {}
-    for name in node_names:
-        network[name] = Gossip(node_handle, name, n_channels)
-    for name in node_names:
-        for neighbor in node_names:
-            if name != neighbor and (name, neighbor) in edge_pairs:
-                network[name].add_subscriber(
-                    neighbor, Subscriber(node_handle, neighbor)
-                )
+    neighbor_names_dict: Dict[str, List[str]] = {name: [] for name in node_names}
+
+    for u, v in edge_pairs:
+        neighbor_names_dict[u].append(v)
+        neighbor_names_dict[v].append(u)
+
+    network: Dict[str, Gossip] = {
+        name: Gossip(
+            node_handle,
+            name,
+            neighbor_names_dict[name],
+            noise_scale,
+            maxsize,
+            n_channels,
+        )
+        for name in node_names
+    }
+
     return network
 
 
@@ -245,7 +227,7 @@ class ConsensusNode(mp.Process):
 
             print(f"Node {self._name} state: {self._state}")
 
-            time.sleep(0.01)
+            time.sleep(0.001)
 
             if self._private_stop_event.is_set():
                 break
@@ -258,6 +240,7 @@ class ConsensusNode(mp.Process):
 
     def shutdown(self):
         self._private_stop_event.set()
+        self.join()
 
 
 if __name__ == "__main__":
@@ -273,6 +256,7 @@ if __name__ == "__main__":
         "5": np.array([20.9, 30.8, 40.7]),
     }
     gossip_network = create_async_network(nh, node_names_, edge_pairs_)
+    alpha = 0.5
 
     nodes = {
         name: ConsensusNode(
@@ -280,7 +264,7 @@ if __name__ == "__main__":
             gossip_network[name],
             initial_states[name],
             nh.stop_event,
-            0.5,
+            alpha,
         )
         for name in node_names_
     }
@@ -288,18 +272,18 @@ if __name__ == "__main__":
     for node in nodes.values():
         node.start()
 
-    time.sleep(2)
+    time.sleep(0.2)
     nodes["1"].shutdown()
-    time.sleep(2)
+    time.sleep(0.2)
     nodes["1"] = ConsensusNode(
         "1",
         gossip_network["1"],
         initial_states["1"],
         nh.stop_event,
-        0.5,
+        alpha,
     )
     nodes["1"].start()
-    time.sleep(2)
+    time.sleep(1)
     nh.stop()
 
     for node in nodes.values():
