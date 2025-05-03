@@ -4,7 +4,7 @@ from numpy.random import normal
 from typing import List, Tuple, Dict, KeysView
 from multiprocessing import Pipe
 from multiprocessing.connection import Connection
-from .gossip import Gossip
+from ..gossip import Gossip
 
 
 class SyncGossip(Gossip):
@@ -68,11 +68,11 @@ def create_sync_network(
         Dict[str, Gossip]: Dictionary mapping node names to SyncGossip instances.
     """
 
-    gossip_map = {name: SyncGossip(name, noise_scale) for name in node_names}
+    network = {name: SyncGossip(name, noise_scale) for name in node_names}
 
     for u, v in edge_pairs:
         conn_u, conn_v = Pipe()
-        gossip_map[u].add_connection(v, conn_u)
-        gossip_map[v].add_connection(u, conn_v)
+        network[u].add_connection(v, conn_u)
+        network[v].add_connection(u, conn_v)
 
-    return gossip_map
+    return network

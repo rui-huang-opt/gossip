@@ -1,12 +1,10 @@
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABCMeta, abstractmethod
-from typing import List, KeysView, TypeVar, Generic, Dict
-
-T = TypeVar("T")
+from typing import List, KeysView
 
 
-class Gossip(Generic[T], metaclass=ABCMeta):
+class Gossip(metaclass=ABCMeta):
     """
     Abstract base class for gossip communication.
     This class defines the interface for both synchronous and asynchronous gossip communication.
@@ -17,23 +15,20 @@ class Gossip(Generic[T], metaclass=ABCMeta):
         name: str,
         noise_scale: int | float | None,
     ):
-        self.name = name
+        self._name = name
         self._noise_scale = noise_scale
-        self._connections: Dict[str, T] = {}
 
     @property
-    def degree(self) -> int:
-        return len(self._connections)
+    def name(self) -> str:
+        return self._name
 
     @property
-    def neighbor_names(self) -> KeysView[str]:
-        return self._connections.keys()
-
     @abstractmethod
-    def send(self, name: str, state: NDArray[np.float64], index: int = 0): ...
+    def degree(self) -> int: ...
 
+    @property
     @abstractmethod
-    def recv(self, name: str, index: int = 0) -> NDArray[np.float64] | None: ...
+    def neighbor_names(self) -> KeysView[str]: ...
 
     @abstractmethod
     def _broadcast_with_noise(self, state: NDArray[np.float64], index: int = 0): ...
@@ -49,19 +44,6 @@ class Gossip(Generic[T], metaclass=ABCMeta):
 
     @abstractmethod
     def gather(self, index: int = 0) -> List[NDArray[np.float64]]: ...
-
-    def add_connection(self, neighbor: str, conn: T):
-        if neighbor in self._connections:
-            raise ValueError(f"Connection to neighbor '{neighbor}' already exists")
-        self._connections[neighbor] = conn
-
-    def remove_connection(self, neighbor: str):
-        if neighbor not in self._connections:
-            raise ValueError(f"No connection to neighbor '{neighbor}'")
-        self._connections.pop(neighbor)
-
-    @abstractmethod
-    def close(self): ...
 
     def compute_laplacian(
         self, state: NDArray[np.float64], index: int = 0
