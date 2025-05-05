@@ -13,7 +13,7 @@ class Gossip(metaclass=ABCMeta):
     def __init__(
         self,
         name: str,
-        noise_scale: int | float | None,
+        noise_scale: float | None,
     ):
         self._name = name
         self._noise_scale = noise_scale
@@ -31,16 +31,7 @@ class Gossip(metaclass=ABCMeta):
     def neighbor_names(self) -> KeysView[str]: ...
 
     @abstractmethod
-    def _broadcast_with_noise(self, state: NDArray[np.float64], index: int = 0): ...
-
-    @abstractmethod
-    def _broadcast_without_noise(self, state: NDArray[np.float64], index: int = 0): ...
-
-    def broadcast(self, state: NDArray[np.float64], index: int = 0):
-        if self._noise_scale:
-            self._broadcast_with_noise(state, index)
-        else:
-            self._broadcast_without_noise(state, index)
+    def broadcast(self, state: NDArray[np.float64], index: int = 0): ...
 
     @abstractmethod
     def gather(self, index: int = 0) -> List[NDArray[np.float64]]: ...

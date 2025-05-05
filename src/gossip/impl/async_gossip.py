@@ -7,7 +7,7 @@ from ..gossip import Gossip
 
 
 class NodeHandle:
-    def __init__(self, stop_event: Event = None):
+    def __init__(self, stop_event: Event | None = None):
         self._stop_event = stop_event if stop_event else mp.Event()
         self._dict: Dict[str, List[mp.Queue]] = {}
 
@@ -71,7 +71,7 @@ class AsyncGossip(Gossip):
         node_handle: NodeHandle,
         name: str,
         neighbor_names: List[str],
-        noise_scale: int | float | None = None,
+        noise_scale: float | None = None,
         maxsize: int = 10,
         n_channels: int = 1,
     ):
@@ -98,12 +98,12 @@ class AsyncGossip(Gossip):
     def neighbor_names(self) -> KeysView[str]:
         return self._subscribers[0].keys()
 
-    def _broadcast_with_noise(self, state, index=0):
-        noise = np.random.normal(scale=self._noise_scale, size=state.shape)
-        self._publishers[index].publish(state + noise)
-
-    def _broadcast_without_noise(self, state, index=0):
-        self._publishers[index].publish(state)
+    def broadcast(self, state: NDArray[np.float64], index: int = 0):
+        if self._noise_scale is None:
+            self._publishers[index].publish(state)
+        else:
+            noise = np.random.normal(scale=self._noise_scale, size=state.shape)
+            self._publishers[index].publish(state + noise)
 
     def gather(self, index: int = 0) -> List[NDArray[np.float64]]:
         data = []
@@ -125,7 +125,7 @@ def create_async_network(
     node_handle: NodeHandle,
     node_names: List[str],
     edge_pairs: List[tuple[str, str]],
-    noise_scale: int | float | None = None,
+    noise_scale: float | None = None,
     maxsize: int = 10,
     n_channels: int = 1,
 ) -> Dict[str, Gossip]:
