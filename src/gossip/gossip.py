@@ -12,14 +12,14 @@ class Gossip(metaclass=ABCMeta):
 
     def __init__(
         self,
-        name: str,
+        name: int | str,
         noise_scale: float | None,
     ):
         self._name = name
         self._noise_scale = noise_scale
 
     @property
-    def name(self) -> str:
+    def name(self) -> int | str:
         return self._name
 
     @property
@@ -28,7 +28,7 @@ class Gossip(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def neighbor_names(self) -> KeysView[str]: ...
+    def neighbor_names(self) -> KeysView[int] | KeysView[str]: ...
 
     @abstractmethod
     def broadcast(self, state: NDArray[np.float64], index: int = 0): ...
@@ -42,4 +42,4 @@ class Gossip(metaclass=ABCMeta):
         self.broadcast(state, index)
         neighbor_states = self.gather(index)
 
-        return len(neighbor_states) * state - sum(neighbor_states)
+        return len(neighbor_states) * state - np.sum(neighbor_states, axis=0)
