@@ -4,7 +4,6 @@ import multiprocessing as mp
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from typing import Dict, List
 from multiprocessing.synchronize import Event, Barrier
 from numpy.typing import NDArray
 from gossip import Gossip, create_async_network, NodeHandle
@@ -17,15 +16,15 @@ class Node(mp.Process):
         initial_state: NDArray[np.float64],
         step_size: float,
         stop_event: Event,
-        global_results: Dict[str, List[NDArray[np.float64]]],
+        global_results: dict[str, list[NDArray[np.float64] | float]],
         start_barrier: Barrier | None = None,
     ):
         super().__init__()
 
         self.comm = comm
         self.state = initial_state
-        self.time_list: List[float] = []
-        self.state_list: List[NDArray[np.float64]] = []
+        self.time_list: list[float] = []
+        self.state_list: list[NDArray[np.float64]] = []
 
         self.step_size = step_size
         self.stop_event = stop_event
@@ -108,13 +107,13 @@ if __name__ == "__main__":
         time.sleep(0.1)
         consensus_nodes["2"].stop()
         time.sleep(0.1)
-        consensus_nodes[0] = Node(
+        consensus_nodes["2"] = Node(
             gossip_network["2"],
             initial_states["2"],
             global_results=g_results["2"],
             **node_params,
         )
-        consensus_nodes[0].start()
+        consensus_nodes["2"].start()
         time.sleep(0.1)
         nh.stop()
 
@@ -181,11 +180,11 @@ if __name__ == "__main__":
 
         fig2, ax2 = plt.subplots()
 
-        time_dict: Dict[str, NDArray[np.float64]] = {
+        time_dict: dict[str, NDArray[np.float64]] = {
             name: np.load(os.path.join(results_dir, f"node_{name}.npz"))["time"]
             for name in node_names
         }
-        states_dict: Dict[str, NDArray[np.float64]] = {
+        states_dict: dict[str, NDArray[np.float64]] = {
             name: np.load(os.path.join(results_dir, f"node_{name}.npz"))["state"]
             for name in node_names
         }
@@ -205,8 +204,8 @@ if __name__ == "__main__":
 
         failure_time_indices = np.where(np.isnan(time_dict["2"]))[0]
         ax2.axvspan(
-            time_dict["2"][failure_time_indices[0] - 1],
-            time_dict["2"][failure_time_indices[0] + 1],
+            time_dict["2"][failure_time_indices[0] - 1].item(),
+            time_dict["2"][failure_time_indices[0] + 1].item(),
             color="gray",
             alpha=0.3,
             label="Node 2 Failure",

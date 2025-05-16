@@ -12,14 +12,14 @@ class Gossip(metaclass=ABCMeta):
 
     def __init__(
         self,
-        name: str,
-        noise_scale: int | float | None,
+        name: int | str,
+        noise_scale: float | None,
     ):
         self._name = name
         self._noise_scale = noise_scale
 
     @property
-    def name(self) -> str:
+    def name(self) -> int | str:
         return self._name
 
     @property
@@ -28,19 +28,10 @@ class Gossip(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def neighbor_names(self) -> KeysView[str]: ...
+    def neighbor_names(self) -> KeysView[int] | KeysView[str]: ...
 
     @abstractmethod
-    def _broadcast_with_noise(self, state: NDArray[np.float64], index: int = 0): ...
-
-    @abstractmethod
-    def _broadcast_without_noise(self, state: NDArray[np.float64], index: int = 0): ...
-
-    def broadcast(self, state: NDArray[np.float64], index: int = 0):
-        if self._noise_scale:
-            self._broadcast_with_noise(state, index)
-        else:
-            self._broadcast_without_noise(state, index)
+    def broadcast(self, state: NDArray[np.float64], index: int = 0): ...
 
     @abstractmethod
     def gather(self, index: int = 0) -> List[NDArray[np.float64]]: ...
@@ -51,4 +42,4 @@ class Gossip(metaclass=ABCMeta):
         self.broadcast(state, index)
         neighbor_states = self.gather(index)
 
-        return len(neighbor_states) * state - sum(neighbor_states)
+        return len(neighbor_states) * state - np.sum(neighbor_states, axis=0)
