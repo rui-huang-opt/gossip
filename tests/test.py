@@ -1,151 +1,73 @@
 import time
 import zmq
-import multiprocessing as mp
-import numpy as np
-from numpy.typing import NDArray
+from multiprocessing import Process
+from functools import cached_property
 
 
-class Server(mp.Process):
-    def __init__(self):
+class Peer(Process):
+    def __init__(self, name: str, neighbors: list[str]):
         super().__init__()
 
-    def run(self):
-        context = zmq.Context()
-        socket = context.socket(zmq.PUSH)
-        socket.bind("ipc://@test")
-
-        for request in range(10):
-            socket.send(b"Hello World")
-            time.sleep(1)
-
-
-class Client(mp.Process):
-    def __init__(self):
-        super().__init__()
-
-    def run(self):
-        context = zmq.Context()
-        socket = context.socket(zmq.PULL)
-        socket.connect("ipc://@test")
-
-        for request in range(10):
-            message = socket.recv()
-            print(f"Received reply {request} [ {message.decode()} ]")
-            time.sleep(1)
-
-
-class Gossip:
-    def __init__(self, name: str, dim: int = 3):
         self._name = name
-        self._dim = dim
-        self._dtype = np.float64
-
+        self._neighbors = neighbors
         self._context = zmq.Context()
 
-        self._pull_socket = self._context.socket(zmq.PULL)
-        self._pull_socket.bind(f"ipc://@{name}")
-        self._push_sockets: dict[str, zmq.SyncSocket] = {}
-
-    @property
+    @cached_property
     def degree(self) -> int:
-        return len(self._push_sockets)
-
-    def add_neighbor(self, neighbor: str):
-        if neighbor in self._push_sockets:
-            return
-        self._push_sockets[neighbor] = self._context.socket(zmq.PUSH)
-        self._push_sockets[neighbor].connect(f"ipc://@{neighbor}")
-
-    def close(self):
-        self._pull_socket.close(linger=0)
-        for socket in self._push_sockets.values():
-            socket.close(linger=0)
-        self._context.term()
-
-    def broadcast(self, data: NDArray[np.float64]):
-        for socket in self._push_sockets.values():
-            socket.send(data.tobytes())
-
-    def gather(self) -> list[NDArray[np.float64]]:
-        msg_list = []
-        for _ in range(self.degree):
-            data = self._pull_socket.recv()
-            arr = np.frombuffer(data, dtype=self._dtype).reshape((self._dim,))
-            msg_list.append(arr)
-        return msg_list
-
-    def compute_laplacian(self, state: NDArray[np.float64]) -> NDArray[np.float64]:
-        self.broadcast(state)
-        neighbor_states = self.gather()
-
-        return state * len(neighbor_states) - sum(neighbor_states)
-
-
-class Node(mp.Process):
-    def __init__(
-        self,
-        name: str,
-        neighbor_names: list[str],
-        state: NDArray[np.float64] | None = None,
-    ):
-        super().__init__()
-        self._name = name
-        self._neighbor_names = neighbor_names
-        self._state = np.zeros((3,), dtype=np.float64) if state is None else state
+        return len(self._neighbors)
 
     def run(self):
-        conn = Gossip(self._name)
-        for neighbor in self._neighbor_names:
-            conn.add_neighbor(neighbor)
+        router = self._context.socket(zmq.ROUTER)
+        router.bind(f"ipc://@{self._name}")
 
-        for k in range(500):
-            error = conn.compute_laplacian(self._state)
-            self._state -= error * 0.45
-            print(f"Node {self._name} state: {self._state}")
+        sockets: dict[str, zmq.SyncSocket] = {}
+        for neighbor in self._neighbors:
+            socket = self._context.socket(zmq.REQ)
+            socket.connect(f"ipc://@{neighbor}")
+            sockets[neighbor] = socket
 
-        conn.close()
+        for k in range(10):
+            msg_list: list[str] = []
+            for neighbor, socket in sockets.items():
+                request = b"iteration " + str(k).encode()
+                socket.send(request)
 
-        print(f"Node {self._name} finished with steps: {k}")
+            for _ in range(self.degree):
+                client, _, request = router.recv_multipart()
+                reply = f"My name is {self._name}, I received: {request.decode()}"
+                router.send_multipart([client, b"", reply.encode()])
+
+            for neighbor, socket in sockets.items():
+                reply = socket.recv()
+                msg_list.append(reply.decode())
+
+            sync = all([msg.endswith(f"iteration {k}") for msg in msg_list])
+            print(f"Sync status for {self._name} at iteration {k}: {sync}")
 
 
 if __name__ == "__main__":
-    states = {
-        "node_0": np.array([1.0, 0.0, 0.0], dtype=np.float64),
-        "node_1": np.array([0.0, 1.0, 0.0], dtype=np.float64),
-        "node_2": np.array([0.0, 0.0, 1.0], dtype=np.float64),
-        "node_3": np.array([1.0, 1.0, 1.0], dtype=np.float64),
-        "node_4": np.array([2.0, 2.0, 2.0], dtype=np.float64),
-        "node_5": np.array([3.0, 3.0, 3.0], dtype=np.float64),
-        "node_6": np.array([4.0, 4.0, 4.0], dtype=np.float64),
-        "node_7": np.array([5.0, 5.0, 5.0], dtype=np.float64),
-        "node_8": np.array([6.0, 6.0, 6.0], dtype=np.float64),
-        "node_9": np.array([7.0, 7.0, 7.0], dtype=np.float64),
-    }
-
-    node_names = list(states.keys())
+    node_names = [f"node_{i}" for i in range(10)]
     edge_pairs = [
         ("node_0", "node_1"),
-        ("node_1", "node_2"),
-        ("node_2", "node_3"),
-        ("node_3", "node_4"),
-        ("node_4", "node_5"),
-        ("node_5", "node_6"),
-        ("node_6", "node_7"),
-        ("node_7", "node_8"),
-        ("node_8", "node_9"),
-        ("node_9", "node_0"),
         ("node_0", "node_2"),
+        ("node_1", "node_3"),
+        ("node_1", "node_4"),
+        ("node_2", "node_5"),
+        ("node_2", "node_6"),
+        ("node_3", "node_7"),
+        ("node_4", "node_8"),
+        ("node_5", "node_9"),
     ]
 
-    topology = {i: [] for i in node_names}
-    for u, v in edge_pairs:
-        topology[u].append(v)
-        topology[v].append(u)
+    network = {name: [] for name in node_names}
+    for a, b in edge_pairs:
+        network[a].append(b)
+        network[b].append(a)
 
-    nodes = {i: Node(i, topology[i], states[i]) for i in node_names}
+    nodes = [Peer(name, neighbors) for name, neighbors in network.items()]
 
-    for node in nodes.values():
+    for node in nodes:
         node.start()
 
-    for node in nodes.values():
+    for node in nodes:
         node.join()
