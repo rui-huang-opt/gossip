@@ -60,4 +60,4 @@ class Gossip(metaclass=ABCMeta):
         self.broadcast(state, index)
         neighbor_states = self.gather(index)
 
-        return len(neighbor_states) * state - np.sum(neighbor_states, axis=0)
+        return len(neighbor_states) * state - sum(neighbor_states)
