@@ -71,7 +71,7 @@ class SyncGossip(Gossip):
 def create_sync_network(
     node_names: list[str],
     edge_pairs: list[tuple[str, str]],
-    noise_scale: float | None,
+    noise_scale: float | None = None,
 ) -> dict[str, SyncGossip]: ...
 
 
@@ -79,7 +79,7 @@ def create_sync_network(
 def create_sync_network(
     node_names: list[int],
     edge_pairs: list[tuple[int, int]],
-    noise_scale: float | None,
+    noise_scale: float | None = None,
 ) -> dict[int, SyncGossip]: ...
 
 
