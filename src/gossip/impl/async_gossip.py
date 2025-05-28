@@ -122,7 +122,7 @@ class AsyncGossip(Gossip):
     def send(self, name, state, index=0):
         raise NotImplementedError("AsyncGossip does not support send operations")
 
-    def receive(self, name, index=0) -> NDArray[np.float64]:
+    def recv(self, name, index=0) -> NDArray[np.float64]:
         raise NotImplementedError("AsyncGossip does not support receive operations")
 
     def broadcast(self, state: NDArray[np.float64], index: int = 0):

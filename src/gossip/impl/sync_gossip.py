@@ -38,7 +38,7 @@ class SyncGossip(Gossip):
         else:
             self._connections[name].send(state)
 
-    def receive(self, name, index=0) -> NDArray[np.float64]:
+    def recv(self, name, index=0) -> NDArray[np.float64]:
         if name not in self._connections:
             raise ValueError(f"Connection to {name} does not exist.")
         return self._connections[name].recv()
