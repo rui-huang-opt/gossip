@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABCMeta, abstractmethod
-from typing import List, KeysView
+from typing import List, KeysView, overload
 
 
 class Gossip(metaclass=ABCMeta):
@@ -29,6 +29,24 @@ class Gossip(metaclass=ABCMeta):
     @property
     @abstractmethod
     def neighbor_names(self) -> KeysView[int] | KeysView[str]: ...
+
+    @overload
+    def send(self, name: str, state: NDArray[np.float64], index: int = 0): ...
+
+    @overload
+    def send(self, name: int, state: NDArray[np.float64], index: int = 0): ...
+
+    @abstractmethod
+    def send(self, name, state, index=0): ...
+
+    @overload
+    def receive(self, name: str, index: int = 0) -> NDArray[np.float64]: ...
+
+    @overload
+    def receive(self, name: int, index: int = 0) -> NDArray[np.float64]: ...
+
+    @abstractmethod
+    def receive(self, name, index=0) -> NDArray[np.float64]: ...
 
     @abstractmethod
     def broadcast(self, state: NDArray[np.float64], index: int = 0): ...

@@ -29,6 +29,20 @@ class SyncGossip(Gossip):
     def neighbor_names(self) -> KeysView[int] | KeysView[str]:
         return self._connections.keys()
 
+    def send(self, name, state, index=0):
+        if name not in self._connections:
+            raise ValueError(f"Connection to {name} does not exist.")
+        if self._noise_scale is not None:
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            state = state + noise
+        else:
+            self._connections[name].send(state)
+
+    def receive(self, name, index=0) -> NDArray[np.float64]:
+        if name not in self._connections:
+            raise ValueError(f"Connection to {name} does not exist.")
+        return self._connections[name].recv()
+
     def broadcast(self, state: NDArray[np.float64], index: int = 0):
         if self._noise_scale is None:
             for conn in self._connections.values():
@@ -40,7 +54,7 @@ class SyncGossip(Gossip):
 
     def gather(self, index: int = 0) -> list[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
-    
+
     @overload
     def add_connection(self, name: str, conn: Connection): ...
 

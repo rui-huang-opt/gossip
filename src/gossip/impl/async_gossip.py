@@ -119,6 +119,12 @@ class AsyncGossip(Gossip):
             raise ValueError("No subscribers found.")
         return self._subscribers[0].keys()
 
+    def send(self, name, state, index=0):
+        raise NotImplementedError("AsyncGossip does not support send operations")
+
+    def receive(self, name, index=0) -> NDArray[np.float64]:
+        raise NotImplementedError("AsyncGossip does not support receive operations")
+
     def broadcast(self, state: NDArray[np.float64], index: int = 0):
         if self._noise_scale is None:
             self._publishers[index].publish(state)
