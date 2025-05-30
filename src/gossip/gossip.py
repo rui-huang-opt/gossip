@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABCMeta, abstractmethod
-from typing import List, KeysView, overload
+from typing import List, KeysView, Any
 
 
 class Gossip(metaclass=ABCMeta):
@@ -12,14 +12,14 @@ class Gossip(metaclass=ABCMeta):
 
     def __init__(
         self,
-        name: int | str,
+        name: Any,
         noise_scale: float | None,
     ):
         self._name = name
         self._noise_scale = noise_scale
 
     @property
-    def name(self) -> int | str:
+    def name(self) -> Any:
         return self._name
 
     @property
@@ -28,25 +28,13 @@ class Gossip(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def neighbor_names(self) -> KeysView[int] | KeysView[str]: ...
-
-    @overload
-    def send(self, name: str, state: NDArray[np.float64], index: int = 0): ...
-
-    @overload
-    def send(self, name: int, state: NDArray[np.float64], index: int = 0): ...
+    def neighbor_names(self) -> KeysView[Any]: ...
 
     @abstractmethod
-    def send(self, name, state, index=0): ...
-
-    @overload
-    def recv(self, name: str, index: int = 0) -> NDArray[np.float64]: ...
-
-    @overload
-    def recv(self, name: int, index: int = 0) -> NDArray[np.float64]: ...
+    def send(self, name: Any, state: NDArray[np.float64], index: int = 0): ...
 
     @abstractmethod
-    def recv(self, name, index=0) -> NDArray[np.float64]: ...
+    def recv(self, name: Any, index: int = 0) -> NDArray[np.float64]: ...
 
     @abstractmethod
     def broadcast(self, state: NDArray[np.float64], index: int = 0): ...
