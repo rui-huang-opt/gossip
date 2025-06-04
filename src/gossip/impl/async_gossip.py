@@ -1,6 +1,6 @@
 import multiprocessing as mp
 import numpy as np
-from typing import KeysView, overload
+from typing import KeysView, Any
 from multiprocessing.synchronize import Event
 from numpy.typing import NDArray
 from ..gossip import Gossip
@@ -63,36 +63,14 @@ class Subscriber:
 
 
 class AsyncGossip(Gossip):
-    @overload
     def __init__(
         self,
         node_handle: NodeHandle,
-        name: int,
-        neighbor_names: list[int],
+        name: Any,
+        neighbor_names: list[Any],
         noise_scale: float | None = None,
         maxsize: int = 10,
         n_channels: int = 1,
-    ): ...
-
-    @overload
-    def __init__(
-        self,
-        node_handle: NodeHandle,
-        name: str,
-        neighbor_names: list[str],
-        noise_scale: float | None = None,
-        maxsize: int = 10,
-        n_channels: int = 1,
-    ): ...
-
-    def __init__(
-        self,
-        node_handle,
-        name,
-        neighbor_names,
-        noise_scale=None,
-        maxsize=10,
-        n_channels=1,
     ):
         super().__init__(name, noise_scale)
 
@@ -119,6 +97,12 @@ class AsyncGossip(Gossip):
             raise ValueError("No subscribers found.")
         return self._subscribers[0].keys()
 
+    def send(self, name, state, index=0):
+        raise NotImplementedError("AsyncGossip does not support send operations")
+
+    def recv(self, name, index=0) -> NDArray[np.float64]:
+        raise NotImplementedError("AsyncGossip does not support receive operations")
+
     def broadcast(self, state: NDArray[np.float64], index: int = 0):
         if self._noise_scale is None:
             self._publishers[index].publish(state)
@@ -135,35 +119,13 @@ class AsyncGossip(Gossip):
         return data
 
 
-@overload
 def create_async_network(
     node_handle: NodeHandle,
-    node_names: list[str],
-    edge_pairs: list[tuple[str, str]],
+    node_names: list[Any],
+    edge_pairs: list[tuple[Any, Any]],
     noise_scale: float | None = None,
     maxsize: int = 10,
     n_channels: int = 1,
-) -> dict[str, AsyncGossip]: ...
-
-
-@overload
-def create_async_network(
-    node_handle: NodeHandle,
-    node_names: list[int],
-    edge_pairs: list[tuple[int, int]],
-    noise_scale: float | None = None,
-    maxsize: int = 10,
-    n_channels: int = 1,
-) -> dict[int, AsyncGossip]: ...
-
-
-def create_async_network(
-    node_handle,
-    node_names,
-    edge_pairs,
-    noise_scale=None,
-    maxsize=10,
-    n_channels=1,
 ):
     neighbor_names_dict = {name: [] for name in node_names}
 

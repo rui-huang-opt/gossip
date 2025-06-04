@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.typing import NDArray
 from numpy.random import normal
-from typing import KeysView, Mapping, overload
+from typing import KeysView, Any
 from multiprocessing import Pipe
 from multiprocessing.connection import Connection
 from ..gossip import Gossip
@@ -15,19 +15,33 @@ class SyncGossip(Gossip):
 
     def __init__(
         self,
-        name: int | str,
+        name: Any,
         noise_scale: float | None = None,
     ):
         super().__init__(name, noise_scale)
-        self._connections: dict[str, Connection] | dict[int, Connection] = {}
+        self._connections: dict[Any, Connection] = {}
 
     @property
     def degree(self) -> int:
         return len(self._connections)
 
     @property
-    def neighbor_names(self) -> KeysView[int] | KeysView[str]:
+    def neighbor_names(self) -> KeysView[Any]:
         return self._connections.keys()
+
+    def send(self, name: Any, state: NDArray[np.float64], index: int = 0):
+        if name not in self._connections:
+            raise ValueError(f"Connection to {name} does not exist.")
+        if self._noise_scale is not None:
+            noise = normal(scale=self._noise_scale, size=state.shape)
+            state = state + noise
+        else:
+            self._connections[name].send(state)
+
+    def recv(self, name: Any, index: int = 0) -> NDArray[np.float64]:
+        if name not in self._connections:
+            raise ValueError(f"Connection to {name} does not exist.")
+        return self._connections[name].recv()
 
     def broadcast(self, state: NDArray[np.float64], index: int = 0):
         if self._noise_scale is None:
@@ -40,39 +54,17 @@ class SyncGossip(Gossip):
 
     def gather(self, index: int = 0) -> list[NDArray[np.float64]]:
         return [conn.recv() for conn in self._connections.values()]
-    
-    @overload
-    def add_connection(self, name: str, conn: Connection): ...
 
-    @overload
-    def add_connection(self, name: int, conn: Connection): ...
-
-    def add_connection(self, name, conn):
+    def add_connection(self, name: Any, conn: Connection):
         if name in self._connections:
             return
         self._connections[name] = conn
 
 
-@overload
 def create_sync_network(
-    node_names: list[str],
-    edge_pairs: list[tuple[str, str]],
-    noise_scale: float | None,
-) -> dict[str, SyncGossip]: ...
-
-
-@overload
-def create_sync_network(
-    node_names: list[int],
-    edge_pairs: list[tuple[int, int]],
-    noise_scale: float | None,
-) -> dict[int, SyncGossip]: ...
-
-
-def create_sync_network(
-    node_names,
-    edge_pairs,
-    noise_scale=None,
+    node_names: list[Any],
+    edge_pairs: list[tuple[Any, Any]],
+    noise_scale: float | None = None,
 ):
     network = {name: SyncGossip(name, noise_scale) for name in node_names}
 
